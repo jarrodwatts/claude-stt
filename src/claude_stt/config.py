@@ -20,7 +20,7 @@ class Config:
 
     # Hotkey settings
     hotkey: str = "ctrl+shift+space"
-    mode: Literal["push-to-talk", "toggle"] = "push-to-talk"
+    mode: Literal["push-to-talk", "toggle"] = "toggle"
 
     # Engine settings
     engine: Literal["moonshine", "whisper"] = "moonshine"

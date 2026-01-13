@@ -17,9 +17,9 @@ claude-stt provides voice input directly into Claude Code. Hold a hotkey, speak,
 
 ## Usage
 
-1. Hold **Ctrl+Shift+Space** (or configured hotkey)
+1. Press **Ctrl+Shift+Space** (or configured hotkey) to start recording
 2. Speak your message
-3. Release to transcribe and insert
+3. Press again to stop and transcribe
 
 ## Commands
 
@@ -43,7 +43,7 @@ Settings are stored in `~/.claude/plugins/claude-stt/config.toml`:
 ```toml
 [claude-stt]
 hotkey = "ctrl+shift+space"
-mode = "push-to-talk"
+mode = "toggle"
 engine = "moonshine"
 moonshine_model = "moonshine/base"
 output_mode = "auto"

@@ -26,7 +26,7 @@ Inside a Claude Code instance, run the following commands:
 /claude-stt:setup
 ```
 
-Done! Hold **Ctrl+Shift+Space** to record, release to transcribe.
+Done! Press **Ctrl+Shift+Space** to start recording, press again to stop and transcribe.
 
 > **Note**: First run downloads the Moonshine model (~200MB). Requires microphone permissions.
 
@@ -47,15 +47,15 @@ Claude STT gives you voice input directly into Claude Code. No typing required �
 ### How It Works
 
 ```
-Hold Ctrl+Shift+Space
+Press Ctrl+Shift+Space → start recording
         ↓
 Audio captured from microphone
+        ↓
+Press Ctrl+Shift+Space → stop recording
         ↓
 Moonshine STT processes locally (~400ms)
         ↓
 Text inserted into Claude Code input
-        ↓
-Release hotkey → done
 ```
 
 **Key details:**
@@ -79,7 +79,7 @@ Customize your settings anytime:
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
 | `hotkey` | Key combo | `ctrl+shift+space` | Trigger recording |
-| `mode` | `push-to-talk`, `toggle` | `push-to-talk` | Hold vs press to toggle |
+| `mode` | `toggle`, `push-to-talk` | `toggle` | Press to toggle vs hold to record |
 | `engine` | `moonshine`, `whisper` | `moonshine` | STT engine |
 | `moonshine_model` | `moonshine/tiny`, `moonshine/base` | `moonshine/base` | Model size |
 | `output_mode` | `auto`, `injection`, `clipboard` | `auto` | How text is inserted |
