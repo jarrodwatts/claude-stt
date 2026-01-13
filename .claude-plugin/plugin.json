@@ -1,0 +1,13 @@
+{
+  "name": "claude-stt",
+  "description": "Speech-to-text input for Claude Code with live streaming dictation",
+  "version": "0.1.0",
+  "author": {
+    "name": "Jarrod Watts",
+    "url": "https://github.com/jarrodwatts"
+  },
+  "homepage": "https://github.com/jarrodwatts/claude-stt",
+  "repository": "https://github.com/jarrodwatts/claude-stt",
+  "license": "MIT",
+  "keywords": ["speech-to-text", "stt", "voice", "dictation", "moonshine", "audio", "accessibility"]
+}

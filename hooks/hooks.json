@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "uv run --directory $CLAUDE_PLUGIN_ROOT python -m claude_stt.daemon start --background",
+        "background": true,
+        "timeout": 5000
+      }
+    ]
+  }
+}

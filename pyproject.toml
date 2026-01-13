@@ -1,0 +1,41 @@
+[project]
+name = "claude-stt"
+version = "0.1.0"
+description = "Speech-to-text input for Claude Code with live streaming dictation"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = "MIT"
+authors = [
+    { name = "Jarrod Watts", email = "jarrod@jarrodwatts.com" }
+]
+keywords = ["claude", "speech-to-text", "stt", "voice", "dictation"]
+
+dependencies = [
+    "useful-moonshine-onnx",
+    "sounddevice>=0.4",
+    "pynput>=1.7",
+    "pyperclip>=1.8",
+    "numpy>=1.24",
+    "tomli>=2.0",
+    "tomli-w>=1.0",
+]
+
+[project.optional-dependencies]
+whisper = ["faster-whisper>=1.0"]
+macos = ["pyobjc-framework-Cocoa"]
+windows = ["pywin32"]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+claude-stt = "claude_stt.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/claude_stt"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
