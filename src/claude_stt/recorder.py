@@ -1,9 +1,12 @@
 """Audio recording using sounddevice."""
 
+import logging
+import math
 import queue
 import threading
-from dataclasses import dataclass, field
-from typing import Callable, Generator, Optional
+from collections import deque
+from dataclasses import dataclass
+from typing import Deque, Generator, Optional
 
 import numpy as np
 
@@ -21,6 +24,8 @@ class RecorderConfig:
     channels: int = 1
     blocksize: int = 1024  # ~64ms at 16kHz
     dtype: str = "float32"
+    queue_maxsize: int = 32
+    max_recording_seconds: Optional[int] = None
 
 
 @dataclass
@@ -48,8 +53,17 @@ class AudioRecorder:
         self._recording = False
         self._audio_queue: queue.Queue[np.ndarray] = queue.Queue()
         self._stream: Optional["sd.InputStream"] = None
-        self._recorded_chunks: list[np.ndarray] = []
+        self._recorded_chunks: Deque[np.ndarray] = deque()
+        self._max_chunks = self._compute_max_chunks()
         self._lock = threading.Lock()
+        self._logger = logging.getLogger(__name__)
+
+    def _compute_max_chunks(self) -> Optional[int]:
+        if not self.config.max_recording_seconds:
+            return None
+        max_seconds = max(1, int(self.config.max_recording_seconds))
+        chunks = max_seconds * self.config.sample_rate / self.config.blocksize
+        return max(1, int(math.ceil(chunks)))
 
     def is_available(self) -> bool:
         """Check if audio recording is available."""
@@ -95,13 +109,19 @@ class AudioRecorder:
             return True
 
         try:
-            self._recorded_chunks = []
-            self._audio_queue = queue.Queue()
+            self._audio_queue = queue.Queue(maxsize=self.config.queue_maxsize)
+            if self._max_chunks:
+                self._recorded_chunks = deque(maxlen=self._max_chunks)
+            else:
+                self._recorded_chunks = deque()
 
             def callback(indata, frames, time_info, status):
                 if status:
-                    pass  # Could log status warnings
-                self._audio_queue.put(indata.copy())
+                    self._logger.debug("Audio callback status: %s", status)
+                try:
+                    self._audio_queue.put_nowait(indata.copy())
+                except queue.Full:
+                    self._logger.debug("Audio queue full; dropping chunk")
                 with self._lock:
                     self._recorded_chunks.append(indata.copy())
 
@@ -117,6 +137,7 @@ class AudioRecorder:
             return True
 
         except Exception:
+            self._logger.exception("Failed to start audio recording")
             return False
 
     def stop(self) -> Optional[np.ndarray]:
@@ -132,7 +153,7 @@ class AudioRecorder:
             self._stream.stop()
             self._stream.close()
         except Exception:
-            pass
+            self._logger.debug("Failed to stop audio stream cleanly", exc_info=True)
 
         self._stream = None
         self._recording = False
@@ -142,8 +163,8 @@ class AudioRecorder:
                 return None
 
             # Concatenate all chunks
-            audio = np.concatenate(self._recorded_chunks)
-            self._recorded_chunks = []
+            audio = np.concatenate(list(self._recorded_chunks))
+            self._recorded_chunks = deque()
             return np.squeeze(audio)
 
     def get_chunk(self, timeout: float = 0.1) -> Optional[np.ndarray]:

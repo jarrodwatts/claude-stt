@@ -1,8 +1,9 @@
 """Configuration management for claude-stt."""
 
+import logging
 import os
 import platform
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -12,6 +13,8 @@ try:
 except ImportError:
     tomli = None
     tomli_w = None
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -62,6 +65,7 @@ class Config:
             return cls()
 
         if tomli is None:
+            logger.warning("tomli not installed; using default config")
             return cls()
 
         try:
@@ -69,7 +73,7 @@ class Config:
                 data = tomli.load(f)
 
             stt_config = data.get("claude-stt", {})
-            return cls(
+            config = cls(
                 hotkey=stt_config.get("hotkey", cls.hotkey),
                 mode=stt_config.get("mode", cls.mode),
                 engine=stt_config.get("engine", cls.engine),
@@ -82,13 +86,16 @@ class Config:
                 output_mode=stt_config.get("output_mode", cls.output_mode),
                 sound_effects=stt_config.get("sound_effects", cls.sound_effects),
             )
+            return config.validate()
         except Exception:
             # If config is corrupted, return defaults
-            return cls()
+            logger.exception("Failed to load config; using defaults")
+            return cls().validate()
 
     def save(self) -> None:
         """Save configuration to file."""
         if tomli_w is None:
+            logger.warning("tomli-w not installed; config not saved")
             return
 
         config_path = self.get_config_path()
@@ -108,8 +115,49 @@ class Config:
             }
         }
 
-        with open(config_path, "wb") as f:
-            tomli_w.dump(data, f)
+        try:
+            with open(config_path, "wb") as f:
+                tomli_w.dump(data, f)
+        except Exception:
+            logger.exception("Failed to save config")
+
+    def validate(self) -> "Config":
+        """Validate and normalize configuration values."""
+        if not isinstance(self.hotkey, str) or not self.hotkey.strip():
+            logger.warning("Invalid hotkey; defaulting to 'ctrl+shift+space'")
+            self.hotkey = "ctrl+shift+space"
+
+        if self.mode not in ("push-to-talk", "toggle"):
+            logger.warning("Invalid mode '%s'; defaulting to 'toggle'", self.mode)
+            self.mode = "toggle"
+
+        if self.engine not in ("moonshine", "whisper"):
+            logger.warning("Invalid engine '%s'; defaulting to 'moonshine'", self.engine)
+            self.engine = "moonshine"
+
+        if self.moonshine_model not in ("moonshine/tiny", "moonshine/base"):
+            logger.warning(
+                "Invalid moonshine_model '%s'; defaulting to 'moonshine/base'",
+                self.moonshine_model,
+            )
+            self.moonshine_model = "moonshine/base"
+
+        if self.output_mode not in ("injection", "clipboard", "auto"):
+            logger.warning("Invalid output_mode '%s'; defaulting to 'auto'", self.output_mode)
+            self.output_mode = "auto"
+
+        if self.max_recording_seconds < 1:
+            logger.warning("max_recording_seconds too low; clamping to 1")
+            self.max_recording_seconds = 1
+        elif self.max_recording_seconds > 600:
+            logger.warning("max_recording_seconds too high; clamping to 600")
+            self.max_recording_seconds = 600
+
+        if self.sample_rate != 16000:
+            logger.warning("sample_rate %s not supported; forcing 16000", self.sample_rate)
+            self.sample_rate = 16000
+
+        return self
 
 
 def get_platform() -> str:

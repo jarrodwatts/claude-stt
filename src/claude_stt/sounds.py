@@ -1,10 +1,14 @@
 """Audio feedback using native system sounds."""
 
-import subprocess
+import logging
 import platform
+import shutil
+import subprocess
+from pathlib import Path
 from typing import Literal
 
 SoundEvent = Literal["start", "stop", "complete", "error", "warning"]
+_logger = logging.getLogger(__name__)
 
 # macOS system sounds
 MACOS_SOUNDS = {
@@ -48,12 +52,19 @@ def play_sound(event: SoundEvent) -> None:
 def _play_macos_sound(event: SoundEvent) -> None:
     """Play sound on macOS using afplay."""
     sound_file = MACOS_SOUNDS.get(event)
-    if sound_file:
-        subprocess.Popen(
-            ["afplay", sound_file],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+    if not sound_file:
+        return
+    if not Path(sound_file).exists():
+        _logger.debug("Sound file missing: %s", sound_file)
+        return
+    if shutil.which("afplay") is None:
+        _logger.debug("afplay not available")
+        return
+    subprocess.Popen(
+        ["afplay", sound_file],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 
 def _play_linux_sound(event: SoundEvent) -> None:
@@ -61,27 +72,26 @@ def _play_linux_sound(event: SoundEvent) -> None:
     sound_file = LINUX_SOUNDS.get(event)
     if not sound_file:
         return
+    if not Path(sound_file).exists():
+        _logger.debug("Sound file missing: %s", sound_file)
+        return
 
     # Try paplay first (PulseAudio/PipeWire)
-    try:
+    if shutil.which("paplay"):
         subprocess.Popen(
             ["paplay", sound_file],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         return
-    except FileNotFoundError:
-        pass
 
     # Fall back to aplay (ALSA)
-    try:
+    if shutil.which("aplay"):
         subprocess.Popen(
             ["aplay", "-q", sound_file],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-    except FileNotFoundError:
-        pass
 
 
 def _play_windows_sound(event: SoundEvent) -> None:
@@ -101,4 +111,4 @@ def _play_windows_sound(event: SoundEvent) -> None:
         sound_type = sound_map.get(event, winsound.MB_OK)
         winsound.MessageBeep(sound_type)
     except ImportError:
-        pass
+        _logger.debug("winsound not available")

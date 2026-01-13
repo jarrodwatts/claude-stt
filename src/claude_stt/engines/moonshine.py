@@ -1,6 +1,7 @@
 """Moonshine STT engine - fast local speech-to-text."""
 
 from typing import Optional
+import logging
 import numpy as np
 
 # Try to import moonshine
@@ -35,6 +36,7 @@ class MoonshineEngine:
         """
         self.model_name = model_name
         self._model: Optional[object] = None
+        self._logger = logging.getLogger(__name__)
 
     def is_available(self) -> bool:
         """Check if Moonshine is available."""
@@ -57,8 +59,8 @@ class MoonshineEngine:
         try:
             self._model = _MoonshineModel(model_name=self.model_name)
             return True
-        except Exception as e:
-            print(f"Failed to load Moonshine model: {e}")
+        except Exception:
+            self._logger.exception("Failed to load Moonshine model")
             return False
 
     def transcribe(self, audio: np.ndarray, sample_rate: int = 16000) -> str:
@@ -95,8 +97,8 @@ class MoonshineEngine:
 
             return ""
 
-        except Exception as e:
-            print(f"Transcription failed: {e}")
+        except Exception:
+            self._logger.exception("Transcription failed")
             return ""
 
     def transcribe_streaming(

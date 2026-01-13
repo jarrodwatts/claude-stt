@@ -127,6 +127,10 @@ Settings stored in `~/.claude/plugins/claude-stt/config.toml`.
 | Hotkey not triggering | Check for conflicts with other apps. Try `/claude-stt:config` to change hotkey |
 | Text going to wrong window | Plugin tracks original window — ensure Claude Code was focused when recording started |
 
+### Logging
+
+Set `CLAUDE_STT_LOG_LEVEL=DEBUG` to get verbose logs when starting the daemon.
+
 ---
 
 ## Privacy

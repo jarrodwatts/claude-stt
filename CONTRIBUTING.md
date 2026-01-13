@@ -24,6 +24,12 @@ uv sync --python 3.12
 claude --plugin-dir .
 ```
 
+## Tests
+
+```bash
+uv run python -m unittest discover -s tests
+```
+
 ## Code Style
 
 - Keep changes focused and small
