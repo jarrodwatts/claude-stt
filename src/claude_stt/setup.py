@@ -62,9 +62,23 @@ def _print_error(message: str) -> None:
     print(f"Error: {message}", file=sys.stderr)
 
 
+def _get_python_install_hint() -> str:
+    plat = get_platform()
+    if plat == "macos":
+        return "Install with: brew install python@3.12\nOr download from: https://www.python.org/downloads/"
+    if plat == "linux":
+        return "Install with: sudo apt install python3 python3-venv python3-pip (Debian/Ubuntu)\nOr: sudo dnf install python3 python3-pip (Fedora/RHEL)"
+    if plat == "windows":
+        return "Download from: https://www.python.org/downloads/\nCheck 'Add Python to PATH' during installation."
+    return "Download from: https://www.python.org/downloads/"
+
+
 def _check_python_version() -> bool:
     if sys.version_info < (3, 10):
-        _print_error("Python 3.10+ required.")
+        current = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        _print_error(f"Python 3.10+ required, but found {current}.")
+        _print_info("")
+        _print_info(_get_python_install_hint())
         return False
     return True
 
