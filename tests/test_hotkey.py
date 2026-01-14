@@ -15,6 +15,19 @@ from claude_stt.errors import HotkeyError
 
 @unittest.skipUnless(_PYNPUT_AVAILABLE, "pynput unavailable in this environment")
 class HotkeyListenerTests(unittest.TestCase):
+    def _press_hotkey(self, listener: HotkeyListener) -> None:
+        for key in listener._hotkey_keys:
+            listener._on_press(key)
+
+    def _release_hotkey(self, listener: HotkeyListener) -> None:
+        key = self._primary_key(listener)
+        listener._on_release(key)
+
+    def _primary_key(self, listener: HotkeyListener):
+        if keyboard.Key.space in listener._hotkey_keys:
+            return keyboard.Key.space
+        return next(iter(listener._hotkey_keys))
+
     def _next_event(self, events: "queue.Queue[str]", timeout: float = 0.5) -> str:
         return events.get(timeout=timeout)
 
@@ -28,18 +41,16 @@ class HotkeyListenerTests(unittest.TestCase):
             on_stop=lambda: events.put("stop"),
         )
 
-        listener._on_press(keyboard.Key.ctrl)
-        listener._on_press(keyboard.Key.shift)
-        listener._on_press(keyboard.Key.space)
+        self._press_hotkey(listener)
         self.assertEqual(self._next_event(events), "start")
 
         # Repeat press while still held should not toggle again.
-        listener._on_press(keyboard.Key.space)
+        listener._on_press(self._primary_key(listener))
         time.sleep(0.05)
         self.assertTrue(events.empty())
 
-        listener._on_release(keyboard.Key.space)
-        listener._on_press(keyboard.Key.space)
+        self._release_hotkey(listener)
+        listener._on_press(self._primary_key(listener))
         self.assertEqual(self._next_event(events), "stop")
 
     def test_push_to_talk_stops_on_release(self):
@@ -52,12 +63,10 @@ class HotkeyListenerTests(unittest.TestCase):
             on_stop=lambda: events.put("stop"),
         )
 
-        listener._on_press(keyboard.Key.ctrl)
-        listener._on_press(keyboard.Key.shift)
-        listener._on_press(keyboard.Key.space)
+        self._press_hotkey(listener)
         self.assertEqual(self._next_event(events), "start")
 
-        listener._on_release(keyboard.Key.space)
+        self._release_hotkey(listener)
         self.assertEqual(self._next_event(events), "stop")
 
     def test_invalid_hotkey_rejected(self):
