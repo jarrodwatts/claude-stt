@@ -30,6 +30,7 @@ python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -m claude_stt.daemon status
 claude-stt daemon started.
 
 Usage:
-  Press Ctrl+Shift+Space to start recording
-  Press again to stop and insert text
+  Default hotkey: Ctrl+Shift+Space
+  Toggle mode: press to start, press again to stop
+  Push-to-talk mode: hold to record, release to stop
 ```

@@ -13,8 +13,18 @@ from typing import Sequence
 def _plugin_root() -> Path:
     env_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if env_root:
-        return Path(env_root)
+        return Path(env_root).expanduser()
     return Path(__file__).resolve().parents[1]
+
+
+def _validate_plugin_root(plugin_root: Path) -> bool:
+    if not plugin_root.exists():
+        print(f"Error: plugin root not found: {plugin_root}", file=sys.stderr)
+        return False
+    if not plugin_root.is_dir():
+        print(f"Error: plugin root is not a directory: {plugin_root}", file=sys.stderr)
+        return False
+    return True
 
 
 def _venv_python(plugin_root: Path) -> Path | None:
@@ -61,10 +71,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     plugin_root = _plugin_root()
+    if not _validate_plugin_root(plugin_root):
+        return 2
     python_prefix = _resolve_python(plugin_root)
     if python_prefix is None:
         if os.environ.get("CLAUDE_STT_PYTHON"):
             return 2
+        print(
+            "Warning: no managed environment found; falling back to system Python. "
+            "Run /claude-stt:setup for a supported install.",
+            file=sys.stderr,
+        )
         python_prefix = [sys.executable]
 
     command = [*python_prefix, *argv]

@@ -258,6 +258,10 @@ class HotkeyListener:
             )
             self._listener.start()
             self._ensure_worker()
+            if not self._listener.is_alive():
+                self._logger.error("Hotkey listener failed to start")
+                self.stop()
+                return False
             return True
         except Exception as e:
             self._logger.error("Failed to start hotkey listener: %s", e)
@@ -279,6 +283,7 @@ class HotkeyListener:
             self._worker_thread.join(timeout=1.0)
             if self._worker_thread.is_alive():
                 self._logger.warning("Hotkey worker did not exit cleanly")
+            self._worker_thread = None
 
     def is_running(self) -> bool:
         """Check if listener is running."""

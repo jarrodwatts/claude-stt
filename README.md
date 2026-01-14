@@ -117,6 +117,13 @@ Settings stored in `~/.claude/plugins/claude-stt/config.toml`.
 | `/claude-stt:status` | Show daemon status and readiness checks |
 | `/claude-stt:config` | Change settings |
 
+You can also use the CLI directly:
+
+```
+claude-stt setup
+claude-stt start --background
+```
+
 ---
 
 ## Troubleshooting
@@ -127,7 +134,7 @@ Settings stored in `~/.claude/plugins/claude-stt/config.toml`.
 | Keyboard injection not working | **macOS**: Grant Accessibility permissions. **Linux**: Ensure xdotool installed |
 | Model not loading | Run `/claude-stt:setup` to download. Check disk space (~200MB) |
 | Hotkey test fails during setup | Fix permissions or rerun `/claude-stt:setup --skip-hotkey-test` to continue setup |
-| Whisper dependencies missing | Run `uv sync --directory $CLAUDE_PLUGIN_ROOT --extra whisper` or `python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -m pip install .[whisper]` |
+| Whisper dependencies missing | Run `/claude-stt:setup --with-whisper`, or `uv sync --directory $CLAUDE_PLUGIN_ROOT --extra whisper`, or `python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -m pip install .[whisper]` |
 | Hotkey not triggering | Check for conflicts with other apps. Try `/claude-stt:config` to change hotkey |
 | Text going to wrong window | Plugin tracks original window — ensure Claude Code was focused when recording started |
 
@@ -156,7 +163,7 @@ git clone https://github.com/jarrodwatts/claude-stt
 cd claude-stt
 
 # Install dependencies (uv preferred, falls back to local venv)
-python scripts/setup.py --skip-audio-test --skip-model-download --no-start
+python scripts/setup.py --dev --skip-audio-test --skip-model-download --no-start
 
 # Test locally without installing
 claude --plugin-dir /path/to/claude-stt

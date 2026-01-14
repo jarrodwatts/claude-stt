@@ -108,7 +108,7 @@ def output_text(
         True if text was output successfully, False otherwise.
     """
     if config is None:
-        config = Config.load()
+        config = Config.load().validate()
 
     # Determine output mode
     mode = config.output_mode

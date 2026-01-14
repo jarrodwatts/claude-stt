@@ -17,11 +17,11 @@ Thanks for contributing to Claude STT. This repo is small and fast-moving, so we
 git clone https://github.com/jarrodwatts/claude-stt
 cd claude-stt
 
-# Install dependencies (requires uv)
-uv sync --python 3.12
+# Install dependencies (uv preferred)
+uv sync --python 3.12 --extra dev
 
-# Or use the bootstrapper (uv preferred, falls back to local venv)
-python scripts/setup.py --skip-audio-test --skip-model-download --no-start
+# Or use the bootstrapper (uv optional, falls back to local venv)
+python scripts/setup.py --dev --skip-audio-test --skip-model-download --no-start
 
 # Test locally with Claude Code
 claude --plugin-dir .

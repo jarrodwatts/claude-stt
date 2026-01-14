@@ -9,10 +9,16 @@ from pathlib import Path
 from typing import Literal
 
 try:
-    import tomli
+    import tomllib as tomli
+except ImportError:
+    try:
+        import tomli
+    except ImportError:
+        tomli = None
+
+try:
     import tomli_w
 except ImportError:
-    tomli = None
     tomli_w = None
 
 logger = logging.getLogger(__name__)
@@ -46,7 +52,7 @@ class Config:
         """Get the configuration directory path."""
         override = os.environ.get("CLAUDE_STT_CONFIG_DIR")
         if override:
-            return Path(override)
+            return Path(override).expanduser()
         return Path.home() / ".claude" / "plugins" / "claude-stt"
 
     @classmethod
@@ -54,7 +60,7 @@ class Config:
         plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
         if not plugin_root:
             return None
-        legacy_path = Path(plugin_root) / "config.toml"
+        legacy_path = Path(plugin_root).expanduser() / "config.toml"
         return legacy_path if legacy_path.exists() else None
 
     @classmethod
@@ -74,7 +80,7 @@ class Config:
 
         if tomli is None:
             logger.warning("tomli not installed; using default config")
-            return cls()
+            return cls().validate()
 
         try:
             source_path = legacy_path or config_path
@@ -110,11 +116,11 @@ class Config:
             logger.exception("Failed to load config; using defaults")
             return cls().validate()
 
-    def save(self) -> None:
+    def save(self) -> bool:
         """Save configuration to file."""
         if tomli_w is None:
             logger.warning("tomli-w not installed; config not saved")
-            return
+            return False
 
         config_path = self.get_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -143,8 +149,10 @@ class Config:
                 temp_file = Path(handle.name)
                 tomli_w.dump(data, handle)
             os.replace(temp_file, config_path)
+            return True
         except Exception:
             logger.exception("Failed to save config")
+            return False
         finally:
             if temp_file and temp_file.exists():
                 try:

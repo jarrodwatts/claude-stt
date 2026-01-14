@@ -17,18 +17,30 @@ from .daemon import is_daemon_running
 from .engine_factory import build_engine
 from .errors import EngineError, HotkeyError
 from .hotkey import HotkeyListener
-from .recorder import AudioRecorder
+from .recorder import AudioRecorder, get_sounddevice_import_error
 
 
 def _get_plugin_root() -> Path:
     env_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if env_root:
-        return Path(env_root)
+        return Path(env_root).expanduser()
     return Path(__file__).resolve().parents[2]
 
 
 def _ensure_plugin_root_env(plugin_root: Path) -> None:
-    os.environ.setdefault("CLAUDE_PLUGIN_ROOT", str(plugin_root))
+    os.environ.setdefault("CLAUDE_PLUGIN_ROOT", str(plugin_root.resolve()))
+
+
+def _validate_plugin_root(plugin_root: Path) -> bool:
+    if not plugin_root.exists():
+        _print_error(f"Plugin root not found: {plugin_root}")
+        return False
+    if not plugin_root.is_dir():
+        _print_error(f"Plugin root is not a directory: {plugin_root}")
+        return False
+    if not (plugin_root / "src" / "claude_stt").exists():
+        _print_warn("Plugin root missing src/claude_stt; continuing anyway.")
+    return True
 
 
 def _configure_logging(level: str) -> None:
@@ -57,11 +69,15 @@ def _check_python_version() -> bool:
     return True
 
 
-def _ensure_config() -> Config:
+def _ensure_config() -> Config | None:
     config = Config.load().validate()
     config_path = Config.get_config_path()
     if not config_path.exists():
-        config.save()
+        if not config.save():
+            _print_error(
+                f"Failed to write config at {config_path}. Check directory permissions."
+            )
+            return None
         _print_info(f"Created config: {config_path}")
     else:
         _print_info(f"Config: {config_path}")
@@ -103,7 +119,19 @@ def _check_audio() -> bool:
         if devices:
             preview = ", ".join(device["name"] for device in devices[:3])
             _print_info(f"Audio input devices detected: {preview}")
+        else:
+            _print_warn("No audio input devices detected; check microphone permissions.")
         return True
+    import_error = get_sounddevice_import_error()
+    if import_error is not None:
+        _print_error(f"Audio backend unavailable: {import_error}")
+        if "No module named" in str(import_error):
+            _print_error(f"Install dependencies: {_dependency_hint()}")
+        else:
+            hint = _audio_backend_hint()
+            if hint:
+                _print_error(hint)
+        return False
     _print_error(
         "No audio input devices found or audio backend unavailable. "
         "Re-run with --skip-audio-test to bypass."
@@ -162,6 +190,17 @@ def _dependency_hint(extra: str | None = None) -> str:
         return cmd
     suffix = f".[{extra}]" if extra else "."
     return f"python {plugin_root}/scripts/exec.py -m pip install {suffix}"
+
+
+def _audio_backend_hint() -> str | None:
+    platform = get_platform()
+    if platform == "macos":
+        return "Install PortAudio (brew install portaudio), then re-run setup."
+    if platform == "linux":
+        return "Install PortAudio (e.g. sudo apt install libportaudio2), then re-run setup."
+    if platform == "windows":
+        return "Install the PortAudio runtime or reinstall Python packages, then re-run setup."
+    return None
 
 
 def _ensure_engine_ready(config: Config, skip_model_download: bool) -> bool:
@@ -245,10 +284,14 @@ def run_setup(args: argparse.Namespace) -> int:
         return 1
 
     plugin_root = _get_plugin_root()
+    if not _validate_plugin_root(plugin_root):
+        return 1
     _ensure_plugin_root_env(plugin_root)
 
     _print_info("claude-stt setup starting.")
     config = _ensure_config()
+    if config is None:
+        return 1
     _check_platform_requirements()
 
     if not args.skip_audio_test and not _check_audio():

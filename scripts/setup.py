@@ -16,7 +16,7 @@ from typing import Sequence
 def _get_plugin_root() -> Path:
     env_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if env_root:
-        return Path(env_root)
+        return Path(env_root).expanduser()
     return Path(__file__).resolve().parents[1]
 
 
@@ -56,6 +56,13 @@ def _validate_plugin_root(plugin_root: Path) -> bool:
     return True
 
 
+def _check_writable(plugin_root: Path) -> bool:
+    if os.access(plugin_root, os.W_OK):
+        return True
+    _print_error(f"Plugin root is not writable: {plugin_root}")
+    return False
+
+
 def _platform_extra() -> str | None:
     system = platform.system()
     if system == "Darwin":
@@ -63,6 +70,19 @@ def _platform_extra() -> str | None:
     if system == "Windows":
         return "windows"
     return None
+
+
+def _check_pip(python_path: Path) -> bool:
+    result = subprocess.run(
+        [str(python_path), "-m", "pip", "--version"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return True
+    _print_error("pip is not available in this Python environment.")
+    _print_error("Install pip (python -m ensurepip --upgrade) or use a Python build with pip.")
+    return False
 
 
 def _venv_python(plugin_root: Path) -> Path:
@@ -88,6 +108,8 @@ def _ensure_venv(plugin_root: Path) -> Path | None:
 
 
 def _pip_install(python_path: Path, plugin_root: Path, extra: str | None) -> int:
+    if not _check_pip(python_path):
+        return 1
     package = f".[{extra}]" if extra else "."
     return _run(
         [
@@ -110,6 +132,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Skip uv sync before running setup.",
     )
+    parser.add_argument(
+        "--with-whisper",
+        action="store_true",
+        help="Install whisper dependencies during setup.",
+    )
+    parser.add_argument(
+        "--dev",
+        action="store_true",
+        help="Install development dependencies during setup.",
+    )
     args, passthrough = parser.parse_known_args(argv)
 
     if not _check_python():
@@ -119,16 +151,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     os.environ.setdefault("CLAUDE_PLUGIN_ROOT", str(plugin_root))
     if not _validate_plugin_root(plugin_root):
         return 1
+    if not _check_writable(plugin_root):
+        return 1
 
     uv = _check_uv()
-    extra = _platform_extra()
+    extras = []
+    platform_extra = _platform_extra()
+    if platform_extra:
+        extras.append(platform_extra)
+    if args.with_whisper:
+        extras.append("whisper")
+    if args.dev:
+        extras.append("dev")
+    extra = ",".join(extras) if extras else None
 
     if uv:
         _print_info("Using uv for dependency install.")
         if not args.skip_sync:
             sync_cmd = [uv, "sync", "--directory", str(plugin_root)]
-            if extra:
-                sync_cmd.extend(["--extra", extra])
+            if extras:
+                for item in extras:
+                    sync_cmd.extend(["--extra", item])
             exit_code = _run(sync_cmd, plugin_root)
             if exit_code != 0:
                 _print_error("uv sync failed.")

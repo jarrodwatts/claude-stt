@@ -230,9 +230,13 @@ def _restore_windows_focus(window_info: WindowInfo) -> bool:
         user32 = ctypes.windll.user32
         hwnd = int(window_info.window_id)
 
+        if not user32.IsWindow(hwnd):
+            return False
+
         # Show and activate the window
         user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-        user32.SetForegroundWindow(hwnd)
+        if not user32.SetForegroundWindow(hwnd):
+            return False
 
         time.sleep(0.1)  # Allow focus to settle
         return True

@@ -10,10 +10,12 @@ from typing import Deque, Generator, Optional
 
 import numpy as np
 
+_SOUNDDEVICE_IMPORT_ERROR: Exception | None = None
 try:
     import sounddevice as sd
-except Exception:
+except Exception as exc:
     sd = None
+    _SOUNDDEVICE_IMPORT_ERROR = exc
 
 
 @dataclass
@@ -71,9 +73,8 @@ class AudioRecorder:
             return False
 
         try:
-            # Try to query default input device
-            sd.query_devices(kind="input")
-            return True
+            devices = sd.query_devices()
+            return any(d.get("max_input_channels", 0) > 0 for d in devices)
         except Exception:
             return False
 
@@ -220,3 +221,8 @@ class AudioRecorder:
         db = 20 * np.log10(max(rms, 1e-10))
         normalized = (db - min_db) / (max_db - min_db)
         return max(0.0, min(1.0, normalized))
+
+
+def get_sounddevice_import_error() -> Exception | None:
+    """Return the sounddevice import error, if any."""
+    return _SOUNDDEVICE_IMPORT_ERROR

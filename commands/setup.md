@@ -20,18 +20,10 @@ python $CLAUDE_PLUGIN_ROOT/scripts/setup.py
 --skip-hotkey-test
 --skip-model-download
 --no-start
+--with-whisper
 ```
 
 ### Success Message
 ```
-claude-stt setup complete!
-
-Usage:
-  Press Ctrl+Shift+Space to start recording
-  Press again to stop and insert text
-
-Commands:
-  /claude-stt:start  - Start the daemon
-  /claude-stt:stop   - Stop the daemon
-  /claude-stt:config - Change settings
+Setup complete.
 ```
