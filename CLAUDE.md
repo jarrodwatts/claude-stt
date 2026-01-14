@@ -1,67 +1,63 @@
-# claude-stt
+# CLAUDE.md
 
-Speech-to-text input for Claude Code with live streaming dictation.
-
-## Overview
-
-claude-stt provides voice input directly into Claude Code. Hold a hotkey, speak, and your words appear in the input field.
-
-## Features
-
-- **Local processing**: All audio is processed on-device using Moonshine STT
-- **Low latency**: ~400ms transcription time
-- **Push-to-talk**: Hold hotkey to record, release to transcribe
-- **Window tracking**: Remembers which window was focused, restores it before typing
-- **Audio feedback**: Native system sounds for start/stop/complete
-- **Cross-platform**: macOS, Linux, Windows
-
-## Usage
-
-1. Press **Ctrl+Shift+Space** (or configured hotkey) to start recording
-2. Speak your message
-3. Press again to stop and transcribe
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commands
 
-- `/claude-stt:setup` - First-time setup and configuration
-- `/claude-stt:start` - Start the daemon
-- `/claude-stt:stop` - Stop the daemon
-- `/claude-stt:config` - Change settings
+```bash
+# Install dependencies (uv preferred)
+uv sync --python 3.12 --extra dev
 
-## Privacy
+# Or bootstrap without uv (creates local .venv)
+python scripts/setup.py --dev --skip-audio-test --skip-model-download --no-start
 
-All audio processing happens locally on your device:
-- Audio is captured from your microphone
-- Transcription uses Moonshine running locally
-- No audio or text is sent to any external service
-- Audio is processed in memory and immediately discarded
+# Run tests
+uv run python -m unittest discover -s tests
 
-## Configuration
+# Run single test
+uv run python -m unittest tests.test_config
 
-Settings are stored in `~/.claude/plugins/claude-stt/config.toml`:
+# Test locally with Claude Code
+claude --plugin-dir .
 
-```toml
-[claude-stt]
-hotkey = "ctrl+shift+space"
-mode = "toggle"
-engine = "moonshine"
-moonshine_model = "moonshine/base"
-output_mode = "auto"
-sound_effects = true
-max_recording_seconds = 300
+# Lint (ruff)
+uv run ruff check src/
 ```
 
-## Troubleshooting
+## Architecture
 
-### No audio input
-- Check microphone permissions in system settings
-- Run `/claude-stt:setup` to test audio devices
+**Daemon-based design**: A background process (`STTDaemon`) runs continuously, listening for hotkey events and coordinating audio capture, transcription, and text output.
 
-### Keyboard injection not working
-- **macOS**: Grant Accessibility permissions in System Settings > Privacy & Security
-- **Linux**: Ensure xdotool is installed; Wayland has limitations
-- Plugin will fall back to clipboard if injection fails
+### Core Components
 
-### Model not loading
-- Run `/claude-stt:setup` to download the model
-- Check disk space (~200MB for moonshine/base)
+- `daemon.py` - Process management (start/stop/status, PID file handling, background spawning)
+- `daemon_service.py` - Runtime orchestration (`STTDaemon` class coordinates all components)
+- `hotkey.py` - Global hotkey listener using pynput (supports toggle and push-to-talk modes)
+- `recorder.py` - Audio capture via sounddevice
+- `engines/` - STT engine implementations (Moonshine default, Whisper optional)
+- `keyboard.py` - Text output via keyboard injection or clipboard fallback
+- `window.py` - Platform-specific window tracking to restore focus after transcription
+- `config.py` - TOML-based config with validation, stored in `~/.claude/plugins/claude-stt/`
+
+### Flow
+
+```
+Hotkey press → AudioRecorder.start() → [user speaks] → Hotkey release
+    → AudioRecorder.stop() → Engine.transcribe() → output_text()
+```
+
+Transcription runs in a dedicated worker thread to avoid blocking the hotkey listener.
+
+### Plugin Structure
+
+- `commands/` - Slash commands (setup, start, stop, status, config) as markdown files
+- `hooks/hooks.json` - Claude Code plugin hooks
+- `scripts/setup.py` - Bootstrap script that handles venv creation, dependency install, model download
+- `.claude-plugin/plugin.json` - Plugin metadata
+
+## Version Bumps
+
+Update version in three files:
+- `pyproject.toml`
+- `.claude-plugin/plugin.json`
+- `.claude-plugin/marketplace.json`
