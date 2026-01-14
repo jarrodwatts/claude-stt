@@ -26,67 +26,49 @@ python3 --version 2>/dev/null || python --version 2>/dev/null || echo "NOT_FOUND
 
 ### Step 2: Install/Upgrade Python (if needed)
 
-Based on the platform, provide these instructions:
+If Python is missing or below 3.10, **run the appropriate installation command** (do not just display it as text). The user will approve it via Claude's permission prompt.
 
 **macOS:**
+
+First check if Homebrew is installed:
+```bash
+command -v brew >/dev/null && echo "brew installed" || echo "brew not installed"
 ```
-claude-stt requires Python 3.10 or higher.
 
-Your system has Python {version} (or none installed).
-
-Install Python 3.12 using Homebrew:
-
-    brew install python@3.12
-
-After installation, verify with:
-    python3 --version
-
-If you don't have Homebrew, install it first:
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+If Homebrew is installed, run:
+```bash
+brew install python@3.12
 ```
+
+If Homebrew is NOT installed, run:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+Then after Homebrew installs, run `brew install python@3.12`.
 
 **Linux (Ubuntu/Debian):**
-```
-claude-stt requires Python 3.10 or higher.
-
-Your system has Python {version} (or none installed).
-
-Install Python:
-
-    sudo apt update
-    sudo apt install python3.12 python3.12-venv python3-pip
-
-Or use the deadsnakes PPA for newer versions:
-    sudo add-apt-repository ppa:deadsnakes/ppa
-    sudo apt update
-    sudo apt install python3.12 python3.12-venv
-
-After installation, verify with:
-    python3 --version
+```bash
+sudo apt update && sudo apt install -y python3.12 python3.12-venv python3-pip
 ```
 
 **Linux (Fedora/RHEL):**
-```
-claude-stt requires Python 3.10 or higher.
-
-Install Python:
-
-    sudo dnf install python3.12 python3-pip
+```bash
+sudo dnf install -y python3.12 python3-pip
 ```
 
 **Windows:**
+
+Windows requires manual installation. Tell the user:
+- Download Python from: https://www.python.org/downloads/
+- Check "Add Python to PATH" during installation
+- Restart terminal after installation
+
+After installation completes, **verify** Python is now available:
+```bash
+python3 --version 2>/dev/null || python --version 2>/dev/null
 ```
-claude-stt requires Python 3.10 or higher.
 
-Download Python from: https://www.python.org/downloads/
-
-IMPORTANT: During installation, check "Add Python to PATH"
-
-After installation, restart your terminal and verify with:
-    python --version
-```
-
-**STOP HERE** until the user confirms Python 3.10+ is installed. Do not proceed to Step 3 until verified.
+If verification shows 3.10+, proceed to Step 3. If it still fails, ask the user to check their PATH or restart their terminal.
 
 ### Step 3: Check for uv (optional but recommended)
 
@@ -94,11 +76,11 @@ After installation, restart your terminal and verify with:
 command -v uv >/dev/null && echo "uv installed" || echo "uv not installed"
 ```
 
-If uv is not installed, mention it's optional but speeds up dependency installation:
+If uv is not installed, offer to install it (optional but recommended):
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-Tip: Install 'uv' for faster dependency installation:
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+If user declines, proceed without uv - pip will work fine.
 
 ### Step 4: Run Setup Script
 
