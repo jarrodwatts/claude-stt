@@ -105,12 +105,12 @@ Tip: Install 'uv' for faster dependency installation:
 Once Python 3.10+ is confirmed, run the setup script:
 
 ```bash
-python3 $CLAUDE_PLUGIN_ROOT/scripts/setup.py
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/setup.py
 ```
 
 If `python3` doesn't work but `python` does (and is 3.10+):
 ```bash
-python $CLAUDE_PLUGIN_ROOT/scripts/setup.py
+python ${CLAUDE_PLUGIN_ROOT}/scripts/setup.py
 ```
 
 ### Step 5: Handle Common Errors

@@ -12,12 +12,12 @@ When the user runs `/claude-stt:stop`:
 
 1. Stop the daemon:
 ```bash
-python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -m claude_stt.daemon stop
+python ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon stop
 ```
 
 2. Confirm status:
 ```bash
-python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -m claude_stt.daemon status
+python ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon status
 ```
 
 3. Show message:

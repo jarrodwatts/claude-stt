@@ -11,7 +11,7 @@ Show daemon status plus hotkey/engine/output readiness.
 When the user runs `/claude-stt:status`:
 
 ```bash
-python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -m claude_stt.daemon status
+python ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon status
 ```
 
 ### Example Output
