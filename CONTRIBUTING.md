@@ -20,6 +20,9 @@ cd claude-stt
 # Install dependencies (requires uv)
 uv sync --python 3.12
 
+# Or use the bootstrapper (uv preferred, falls back to local venv)
+python scripts/setup.py --skip-audio-test --skip-model-download --no-start
+
 # Test locally with Claude Code
 claude --plugin-dir .
 ```

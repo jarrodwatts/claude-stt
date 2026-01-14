@@ -1,10 +1,18 @@
 """Keyboard output: direct injection or clipboard fallback."""
 
-from typing import Optional
 import logging
 import time
+from typing import Optional
 
-from pynput.keyboard import Controller, Key
+try:
+    from pynput.keyboard import Controller, Key
+    _PYNPUT_AVAILABLE = True
+    _PYNPUT_IMPORT_ERROR: Exception | None = None
+except Exception as exc:
+    Controller = None
+    Key = None
+    _PYNPUT_AVAILABLE = False
+    _PYNPUT_IMPORT_ERROR = exc
 
 from .config import Config, is_wayland
 from .sounds import play_sound
@@ -16,14 +24,28 @@ _injection_capable: Optional[bool] = None
 _injection_checked_at: Optional[float] = None
 _injection_cache_ttl = 300.0
 _logger = logging.getLogger(__name__)
+_pynput_warned = False
 
 
 def get_keyboard() -> Controller:
     """Get the global keyboard controller."""
     global _keyboard
+    if not _PYNPUT_AVAILABLE:
+        raise RuntimeError("pynput unavailable; keyboard injection disabled")
     if _keyboard is None:
         _keyboard = Controller()
     return _keyboard
+
+
+def _warn_pynput_missing() -> None:
+    global _pynput_warned
+    if _pynput_warned:
+        return
+    message = "pynput unavailable; falling back to clipboard output"
+    if _PYNPUT_IMPORT_ERROR:
+        message = f"{message} ({_PYNPUT_IMPORT_ERROR})"
+    _logger.warning(message)
+    _pynput_warned = True
 
 
 def test_injection() -> bool:
@@ -46,6 +68,12 @@ def test_injection() -> bool:
 
     # On Wayland, injection typically doesn't work
     if is_wayland():
+        _injection_capable = False
+        _injection_checked_at = now
+        return _injection_capable
+
+    if not _PYNPUT_AVAILABLE:
+        _warn_pynput_missing()
         _injection_capable = False
         _injection_checked_at = now
         return _injection_capable
@@ -89,6 +117,9 @@ def output_text(
         _logger.debug("Output mode auto-selected: %s", mode)
 
     if mode == "injection":
+        if not _PYNPUT_AVAILABLE:
+            _warn_pynput_missing()
+            return _output_via_clipboard(text, config)
         return _output_via_injection(text, window_info, config)
     else:
         return _output_via_clipboard(text, config)
@@ -110,6 +141,9 @@ def _output_via_injection(
         True if successful, False otherwise.
     """
     try:
+        if not _PYNPUT_AVAILABLE:
+            _warn_pynput_missing()
+            return _output_via_clipboard(text, config)
         # Restore focus to original window if provided
         if window_info is not None:
             if not restore_focus(window_info):
@@ -146,6 +180,9 @@ def _output_via_clipboard(text: str, config: Config) -> bool:
             import pyperclip
         except ImportError:
             _logger.error("pyperclip not installed; clipboard output unavailable")
+            return False
+        if hasattr(pyperclip, "is_available") and not pyperclip.is_available():
+            _logger.error("No clipboard mechanism available")
             return False
 
         pyperclip.copy(text)

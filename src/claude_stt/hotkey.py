@@ -1,12 +1,19 @@
 """Global hotkey detection using pynput."""
 
 import logging
+import platform
 import queue
 import threading
-import platform
 from typing import Callable, Optional
 
-from pynput import keyboard
+try:
+    from pynput import keyboard
+    _PYNPUT_AVAILABLE = True
+    _PYNPUT_IMPORT_ERROR: Exception | None = None
+except Exception as exc:
+    keyboard = None
+    _PYNPUT_AVAILABLE = False
+    _PYNPUT_IMPORT_ERROR = exc
 
 from .errors import HotkeyError
 
@@ -49,10 +56,16 @@ class HotkeyListener:
         self._worker_thread: Optional[threading.Thread] = None
         self._worker_stop = threading.Event()
 
+        if not _PYNPUT_AVAILABLE:
+            message = "pynput unavailable; hotkeys cannot be registered"
+            if _PYNPUT_IMPORT_ERROR:
+                message = f"{message}: {_PYNPUT_IMPORT_ERROR}"
+            raise HotkeyError(message)
+
         # Parse the hotkey
         self._hotkey_keys = self._parse_hotkey(hotkey)
         if not self._hotkey_keys:
-            raise ValueError(f"Hotkey '{hotkey}' did not map to any keys")
+            raise HotkeyError(f"Hotkey '{hotkey}' did not map to any keys")
 
     def _parse_hotkey(self, hotkey_str: str) -> set:
         """Parse hotkey string to a set of keys.
@@ -232,6 +245,9 @@ class HotkeyListener:
         Returns:
             True if listener started successfully.
         """
+        if not _PYNPUT_AVAILABLE:
+            self._logger.error("pynput unavailable; cannot start hotkey listener")
+            return False
         if self._listener is not None:
             return True
 

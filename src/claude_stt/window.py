@@ -7,6 +7,8 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
+from .config import is_wayland
+
 
 @dataclass
 class WindowInfo:
@@ -84,6 +86,7 @@ def _get_macos_window() -> Optional[WindowInfo]:
         ["osascript", "-e", script],
         capture_output=True,
         text=True,
+        timeout=2,
     )
 
     if result.returncode == 0:
@@ -99,37 +102,51 @@ def _get_macos_window() -> Optional[WindowInfo]:
     return None
 
 
+def _escape_applescript_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def _restore_macos_focus(window_info: WindowInfo) -> bool:
     """Restore focus on macOS using AppleScript."""
-    if window_info.app_name and window_info.window_id:
+    app_name = _escape_applescript_string(window_info.app_name or "")
+    try:
+        window_id = int(window_info.window_id) if window_info.window_id else None
+    except (TypeError, ValueError):
+        window_id = None
+
+    if app_name and window_id:
         script = f'''
         tell application "System Events"
-            tell process "{window_info.app_name}"
+            tell process "{app_name}"
                 set frontmost to true
-                if (exists (first window whose id is {window_info.window_id})) then
-                    perform action "AXRaise" of (first window whose id is {window_info.window_id})
+                if (exists (first window whose id is {window_id})) then
+                    perform action "AXRaise" of (first window whose id is {window_id})
                 end if
             end tell
         end tell
         '''
-    elif window_info.app_name:
+    elif app_name:
         script = f'''
         tell application "System Events"
-            tell process "{window_info.app_name}"
+            tell process "{app_name}"
                 set frontmost to true
             end tell
         end tell
         '''
-    else:
+    elif window_id:
         script = f'''
         tell application "System Events"
-            set frontmost of (first process whose unix id is {window_info.window_id}) to true
+            set frontmost of (first process whose unix id is {window_id}) to true
         end tell
         '''
+    else:
+        return False
 
     result = subprocess.run(
         ["osascript", "-e", script],
         capture_output=True,
+        text=True,
+        timeout=2,
     )
 
     if result.returncode == 0:
@@ -144,11 +161,15 @@ def _restore_macos_focus(window_info: WindowInfo) -> bool:
 
 def _get_linux_window() -> Optional[WindowInfo]:
     """Get active window on Linux using xdotool."""
+    if is_wayland():
+        logging.getLogger(__name__).debug("Wayland session; skipping xdotool window check")
+        return None
     try:
         result = subprocess.run(
             ["xdotool", "getactivewindow"],
             capture_output=True,
             text=True,
+            timeout=2,
         )
 
         if result.returncode == 0:
@@ -164,10 +185,15 @@ def _get_linux_window() -> Optional[WindowInfo]:
 
 def _restore_linux_focus(window_info: WindowInfo) -> bool:
     """Restore focus on Linux using xdotool."""
+    if is_wayland():
+        logging.getLogger(__name__).debug("Wayland session; skipping xdotool focus restore")
+        return False
     try:
         result = subprocess.run(
             ["xdotool", "windowactivate", window_info.window_id],
             capture_output=True,
+            text=True,
+            timeout=2,
         )
 
         if result.returncode == 0:

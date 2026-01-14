@@ -12,7 +12,7 @@ When the user runs `/claude-stt:config`:
 
 1. Show current configuration:
 ```bash
-cd $CLAUDE_PLUGIN_ROOT && uv run python -c "
+python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -c "
 from claude_stt.config import Config
 config = Config.load()
 print('Current Configuration:')
@@ -34,7 +34,7 @@ print(f'  Max recording: {config.max_recording_seconds}s')
 
 3. Update configuration:
 ```bash
-cd $CLAUDE_PLUGIN_ROOT && uv run python -c "
+python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -c "
 from claude_stt.config import Config
 config = Config.load()
 # Update fields as needed
@@ -46,8 +46,8 @@ print('Configuration saved.')
 
 4. Restart daemon for changes to take effect:
 ```bash
-cd $CLAUDE_PLUGIN_ROOT && uv run python -m claude_stt.daemon stop
-cd $CLAUDE_PLUGIN_ROOT && uv run python -m claude_stt.daemon start --background
+python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -m claude_stt.daemon stop
+python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -m claude_stt.daemon start --background
 ```
 
 ## Configuration Options

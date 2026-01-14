@@ -2,6 +2,7 @@ import unittest
 
 from claude_stt.config import Config
 from claude_stt.engine_factory import build_engine
+from claude_stt.engines.whisper import WhisperEngine
 from claude_stt.errors import EngineError
 
 
@@ -13,10 +14,10 @@ class EngineFactoryTests(unittest.TestCase):
         with self.assertRaises(EngineError):
             build_engine(config)
 
-    def test_whisper_unimplemented(self):
+    def test_whisper_engine_constructed(self):
         config = Config(engine="whisper")
-        with self.assertRaises(EngineError):
-            build_engine(config)
+        engine = build_engine(config)
+        self.assertIsInstance(engine, WhisperEngine)
 
 
 if __name__ == "__main__":

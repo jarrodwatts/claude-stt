@@ -28,7 +28,8 @@ Inside a Claude Code instance, run the following commands:
 
 Done! Press **Ctrl+Shift+Space** to start recording, press again to stop and transcribe.
 
-> **Note**: First run downloads the Moonshine model (~200MB). Requires microphone permissions.
+> **Note**: Setup installs dependencies (uv if available, otherwise a local `.venv`),
+> downloads the Moonshine model (~200MB), and checks microphone permissions.
 
 ---
 
@@ -92,7 +93,7 @@ Settings stored in `~/.claude/plugins/claude-stt/config.toml`.
 
 ## Requirements
 
-- **Python 3.10-3.13** (via uv)
+- **Python 3.10-3.13**
 - **~200MB disk space** for STT model
 - **Microphone access**
 
@@ -113,6 +114,7 @@ Settings stored in `~/.claude/plugins/claude-stt/config.toml`.
 | `/claude-stt:setup` | First-time setup: check environment, install deps, download model |
 | `/claude-stt:start` | Start the STT daemon |
 | `/claude-stt:stop` | Stop the STT daemon |
+| `/claude-stt:status` | Show daemon status and readiness checks |
 | `/claude-stt:config` | Change settings |
 
 ---
@@ -124,6 +126,8 @@ Settings stored in `~/.claude/plugins/claude-stt/config.toml`.
 | No audio input | Check microphone permissions in system settings |
 | Keyboard injection not working | **macOS**: Grant Accessibility permissions. **Linux**: Ensure xdotool installed |
 | Model not loading | Run `/claude-stt:setup` to download. Check disk space (~200MB) |
+| Hotkey test fails during setup | Fix permissions or rerun `/claude-stt:setup --skip-hotkey-test` to continue setup |
+| Whisper dependencies missing | Run `uv sync --directory $CLAUDE_PLUGIN_ROOT --extra whisper` or `python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -m pip install .[whisper]` |
 | Hotkey not triggering | Check for conflicts with other apps. Try `/claude-stt:config` to change hotkey |
 | Text going to wrong window | Plugin tracks original window — ensure Claude Code was focused when recording started |
 
@@ -150,13 +154,22 @@ Set `CLAUDE_STT_LOG_LEVEL=DEBUG` to get verbose logs when starting the daemon.
 ```bash
 git clone https://github.com/jarrodwatts/claude-stt
 cd claude-stt
-uv sync --python 3.12
+
+# Install dependencies (uv preferred, falls back to local venv)
+python scripts/setup.py --skip-audio-test --skip-model-download --no-start
 
 # Test locally without installing
 claude --plugin-dir /path/to/claude-stt
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Release Checklist
+
+- Bump versions in `pyproject.toml`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
+- Update `CHANGELOG.md`
+- Run tests: `uv run python -m unittest discover -s tests`
+- Verify onboarding in Claude Code (`/plugin install`, `/claude-stt:setup`)
 
 ---
 

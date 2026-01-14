@@ -3,6 +3,7 @@
 import logging
 import os
 import platform
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -43,13 +44,18 @@ class Config:
     @classmethod
     def get_config_dir(cls) -> Path:
         """Get the configuration directory path."""
-        # Check for Claude plugin directory first
-        plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
-        if plugin_root:
-            return Path(plugin_root)
-
-        # Fall back to ~/.claude/plugins/claude-stt
+        override = os.environ.get("CLAUDE_STT_CONFIG_DIR")
+        if override:
+            return Path(override)
         return Path.home() / ".claude" / "plugins" / "claude-stt"
+
+    @classmethod
+    def _legacy_config_path(cls) -> Path | None:
+        plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
+        if not plugin_root:
+            return None
+        legacy_path = Path(plugin_root) / "config.toml"
+        return legacy_path if legacy_path.exists() else None
 
     @classmethod
     def get_config_path(cls) -> Path:
@@ -60,16 +66,19 @@ class Config:
     def load(cls) -> "Config":
         """Load configuration from file, or return defaults."""
         config_path = cls.get_config_path()
-
+        legacy_path = None
         if not config_path.exists():
-            return cls()
+            legacy_path = cls._legacy_config_path()
+            if legacy_path is None:
+                return cls()
 
         if tomli is None:
             logger.warning("tomli not installed; using default config")
             return cls()
 
         try:
-            with open(config_path, "rb") as f:
+            source_path = legacy_path or config_path
+            with open(source_path, "rb") as f:
                 data = tomli.load(f)
 
             stt_config = data.get("claude-stt", {})
@@ -86,7 +95,16 @@ class Config:
                 output_mode=stt_config.get("output_mode", cls.output_mode),
                 sound_effects=stt_config.get("sound_effects", cls.sound_effects),
             )
-            return config.validate()
+            config = config.validate()
+            if legacy_path and tomli_w is not None:
+                try:
+                    config.save()
+                    logger.info(
+                        "Migrated config to %s", cls.get_config_path()
+                    )
+                except Exception:
+                    logger.exception("Failed to migrate legacy config")
+            return config
         except Exception:
             # If config is corrupted, return defaults
             logger.exception("Failed to load config; using defaults")
@@ -115,11 +133,24 @@ class Config:
             }
         }
 
+        temp_file = None
         try:
-            with open(config_path, "wb") as f:
-                tomli_w.dump(data, f)
+            with tempfile.NamedTemporaryFile(
+                "wb",
+                delete=False,
+                dir=str(config_path.parent),
+            ) as handle:
+                temp_file = Path(handle.name)
+                tomli_w.dump(data, handle)
+            os.replace(temp_file, config_path)
         except Exception:
             logger.exception("Failed to save config")
+        finally:
+            if temp_file and temp_file.exists():
+                try:
+                    temp_file.unlink()
+                except OSError:
+                    pass
 
     def validate(self) -> "Config":
         """Validate and normalize configuration values."""
@@ -142,9 +173,34 @@ class Config:
             )
             self.moonshine_model = "moonshine/base"
 
+        if not isinstance(self.whisper_model, str) or not self.whisper_model.strip():
+            logger.warning("Invalid whisper_model; defaulting to 'medium'")
+            self.whisper_model = "medium"
+
         if self.output_mode not in ("injection", "clipboard", "auto"):
             logger.warning("Invalid output_mode '%s'; defaulting to 'auto'", self.output_mode)
             self.output_mode = "auto"
+
+        if not isinstance(self.sound_effects, bool):
+            if isinstance(self.sound_effects, str):
+                self.sound_effects = self.sound_effects.strip().lower() in (
+                    "1",
+                    "true",
+                    "yes",
+                    "on",
+                )
+            else:
+                self.sound_effects = bool(self.sound_effects)
+
+        try:
+            self.max_recording_seconds = int(self.max_recording_seconds)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid max_recording_seconds '%s'; defaulting to %s",
+                self.max_recording_seconds,
+                Config.max_recording_seconds,
+            )
+            self.max_recording_seconds = Config.max_recording_seconds
 
         if self.max_recording_seconds < 1:
             logger.warning("max_recording_seconds too low; clamping to 1")

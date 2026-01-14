@@ -8,6 +8,7 @@ import queue
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -18,7 +19,7 @@ from .engine_factory import build_engine
 from .engines import STTEngine
 from .errors import EngineError, HotkeyError, RecorderError
 from .hotkey import HotkeyListener
-from .keyboard import output_text
+from .keyboard import output_text, test_injection
 from .recorder import AudioRecorder, RecorderConfig
 from .sounds import play_sound
 from .window import get_active_window, WindowInfo
@@ -121,7 +122,8 @@ class STTDaemon:
                 continue
 
             if text:
-                output_text(text, window_info, self.config)
+                if not output_text(text, window_info, self.config):
+                    self._logger.warning("Failed to output transcription")
             elif self.config.sound_effects:
                 play_sound("warning")
 
@@ -142,6 +144,7 @@ class STTDaemon:
                 if self.config.sound_effects:
                     play_sound("start")
             else:
+                self._logger.error("Audio recorder failed to start")
                 self._recording = False
                 if self.config.sound_effects:
                     play_sound("error")
@@ -179,10 +182,11 @@ class STTDaemon:
         elapsed = time.time() - self._record_start_time
         max_seconds = self.config.max_recording_seconds
 
-        # Warning at 30 seconds before max
-        if elapsed >= max_seconds - 30 and elapsed < max_seconds - 29:
-            if self.config.sound_effects:
-                play_sound("warning")
+        if max_seconds > 30:
+            # Warning at 30 seconds before max
+            if elapsed >= max_seconds - 30 and elapsed < max_seconds - 29:
+                if self.config.sound_effects:
+                    play_sound("warning")
 
         # Auto-stop at max
         if elapsed >= max_seconds:
@@ -266,7 +270,11 @@ def _read_pid_file() -> Optional[dict]:
     if not pid_file.exists():
         return None
 
-    raw = pid_file.read_text().strip()
+    try:
+        raw = pid_file.read_text(encoding="utf-8", errors="replace").strip()
+    except Exception:
+        logging.getLogger(__name__).debug("Failed to read PID file", exc_info=True)
+        return None
     if not raw:
         return None
 
@@ -289,20 +297,41 @@ def _write_pid_file(pid: int) -> None:
         "pid": pid,
         "command": " ".join(sys.argv),
         "created_at": time.time(),
+        "config_dir": str(Config.get_config_dir()),
     }
     pid_file = get_pid_file()
     pid_file.parent.mkdir(parents=True, exist_ok=True)
-    pid_file.write_text(json.dumps(data))
+    temp_file = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            delete=False,
+            dir=str(pid_file.parent),
+            encoding="utf-8",
+        ) as handle:
+            temp_file = Path(handle.name)
+            handle.write(json.dumps(data))
+        os.replace(temp_file, pid_file)
+    finally:
+        if temp_file and temp_file.exists():
+            try:
+                temp_file.unlink()
+            except OSError:
+                pass
 
 
 def is_daemon_running() -> bool:
     """Check if daemon is running."""
+    pid_file = get_pid_file()
     data = _read_pid_file()
     if not data:
         return False
 
     try:
         pid = int(data["pid"])
+        if pid <= 0:
+            pid_file.unlink(missing_ok=True)
+            return False
         # Check if process exists
         os.kill(pid, 0)
         command = _get_process_command(pid)
@@ -315,40 +344,74 @@ def is_daemon_running() -> bool:
             pid_file.unlink(missing_ok=True)
             return False
         return True
-    except (ValueError, ProcessLookupError, PermissionError):
+    except PermissionError:
+        return True
+    except (ValueError, ProcessLookupError, OSError):
         # PID file exists but process doesn't
-        get_pid_file().unlink(missing_ok=True)
+        pid_file.unlink(missing_ok=True)
         return False
 
 
 def _get_process_command(pid: int) -> Optional[str]:
     if os.name == "nt":
-        try:
-            result = subprocess.run(
-                ["wmic", "process", "where", f"ProcessId={pid}", "get", "CommandLine"],
-                capture_output=True,
-                text=True,
-            )
-        except FileNotFoundError:
-            return None
-        if result.returncode != 0:
-            return None
-        lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-        if len(lines) < 2:
-            return None
-        return lines[1]
+        return _get_windows_process_command(pid)
 
     proc_cmdline = Path(f"/proc/{pid}/cmdline")
     if proc_cmdline.exists():
-        raw = proc_cmdline.read_text()
-        command = " ".join(part for part in raw.split("\x00") if part)
-        return command or None
+        try:
+            raw = proc_cmdline.read_text(encoding="utf-8", errors="replace")
+            command = " ".join(part for part in raw.split("\x00") if part)
+            return command or None
+        except Exception:
+            logging.getLogger(__name__).debug("Failed to read /proc cmdline", exc_info=True)
 
     result = subprocess.run(
         ["ps", "-p", str(pid), "-o", "command="],
         capture_output=True,
         text=True,
+        timeout=2,
     )
+    if result.returncode != 0:
+        return None
+    command = result.stdout.strip()
+    return command or None
+
+
+def _get_windows_process_command(pid: int) -> Optional[str]:
+    try:
+        result = subprocess.run(
+            ["wmic", "process", "where", f"ProcessId={pid}", "get", "CommandLine"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0:
+            lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            if len(lines) >= 2:
+                return lines[1]
+    except FileNotFoundError:
+        pass
+    except Exception:
+        logging.getLogger(__name__).debug("wmic lookup failed", exc_info=True)
+
+    try:
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                f"Get-CimInstance Win32_Process -Filter \"ProcessId={pid}\" | "
+                "Select-Object -ExpandProperty CommandLine",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except FileNotFoundError:
+        return None
+    except Exception:
+        logging.getLogger(__name__).debug("PowerShell lookup failed", exc_info=True)
+        return None
     if result.returncode != 0:
         return None
     command = result.stdout.strip()
@@ -373,19 +436,29 @@ def start_daemon(background: bool = False):
         return
 
     if background and os.name == "nt":
-        logging.getLogger(__name__).warning("Background mode is not supported on Windows")
+        if _spawn_windows_background():
+            return
+        logging.getLogger(__name__).warning(
+            "Background spawn failed on Windows; running in foreground"
+        )
         background = False
 
     if background:
         # Fork to background (Unix only)
         if os.name != "nt":
-            pid = os.fork()
-            if pid > 0:
-                # Parent process
-                logging.getLogger(__name__).info("Daemon started with PID %s", pid)
-                return
-            # Child process continues
-            os.setsid()
+            try:
+                pid = os.fork()
+            except OSError as exc:
+                logging.getLogger(__name__).warning(
+                    "Background fork failed (%s); running in foreground", exc
+                )
+            else:
+                if pid > 0:
+                    # Parent process
+                    logging.getLogger(__name__).info("Daemon started with PID %s", pid)
+                    return
+                # Child process continues
+                os.setsid()
 
     # Write PID file
     _write_pid_file(os.getpid())
@@ -397,6 +470,29 @@ def start_daemon(background: bool = False):
         get_pid_file().unlink(missing_ok=True)
 
 
+def _spawn_windows_background() -> bool:
+    env = os.environ.copy()
+    env.setdefault("CLAUDE_PLUGIN_ROOT", str(Config.get_config_dir()))
+    cmd = [sys.executable, "-m", "claude_stt.daemon", "run"]
+    creationflags = 0
+    creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    creationflags |= getattr(subprocess, "DETACHED_PROCESS", 0)
+    try:
+        subprocess.Popen(
+            cmd,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            creationflags=creationflags,
+        )
+        logging.getLogger(__name__).info("Daemon started in background (Windows).")
+        return True
+    except Exception:
+        logging.getLogger(__name__).exception("Failed to spawn Windows background daemon")
+        return False
+
+
 def stop_daemon():
     """Stop the running daemon."""
     data = _read_pid_file()
@@ -404,6 +500,7 @@ def stop_daemon():
         logging.getLogger(__name__).info("Daemon is not running.")
         return
 
+    pid_file = get_pid_file()
     try:
         pid = int(data["pid"])
         command = _get_process_command(pid)
@@ -411,6 +508,7 @@ def stop_daemon():
             logging.getLogger(__name__).warning(
                 "PID %s does not look like claude-stt; refusing to kill", pid
             )
+            pid_file.unlink(missing_ok=True)
             return
         os.kill(pid, signal.SIGTERM)
         logging.getLogger(__name__).info("Sent stop signal to daemon (PID %s)", pid)
@@ -428,20 +526,68 @@ def stop_daemon():
             kill_signal = signal.SIGKILL if hasattr(signal, "SIGKILL") else signal.SIGTERM
             os.kill(pid, kill_signal)
 
-    except (ValueError, ProcessLookupError):
+    except PermissionError:
+        logging.getLogger(__name__).warning(
+            "Permission denied stopping daemon (PID %s); leaving PID file intact", pid
+        )
+        return
+    except (ValueError, ProcessLookupError, OSError):
         logging.getLogger(__name__).info("Daemon is not running.")
-
-    get_pid_file().unlink(missing_ok=True)
+        pid_file.unlink(missing_ok=True)
+    else:
+        pid_file.unlink(missing_ok=True)
 
 
 def daemon_status():
     """Print daemon status."""
-    if is_daemon_running():
+    logger = logging.getLogger(__name__)
+    running = is_daemon_running()
+    if running:
         data = _read_pid_file()
         pid = data["pid"] if data else "unknown"
-        logging.getLogger(__name__).info("Daemon is running (PID %s)", pid)
+        logger.info("Daemon is running (PID %s)", pid)
     else:
-        logging.getLogger(__name__).info("Daemon is not running.")
+        logger.info("Daemon is not running.")
+
+    config = Config.load().validate()
+    logger.info("Config path: %s", Config.get_config_path())
+    logger.info("Hotkey: %s", config.hotkey)
+    logger.info("Mode: %s", config.mode)
+    logger.info("Engine: %s", config.engine)
+
+    try:
+        engine = build_engine(config)
+        if engine.is_available():
+            logger.info("Engine availability: ready")
+        else:
+            logger.warning("Engine availability: missing dependencies")
+    except EngineError as exc:
+        logger.warning("Engine availability: %s", exc)
+
+    if config.output_mode == "auto":
+        injection_ready = test_injection()
+        output_label = "injection" if injection_ready else "clipboard"
+        logger.info("Output mode: auto (%s)", output_label)
+    else:
+        logger.info("Output mode: %s", config.output_mode)
+
+    if running:
+        logger.info("Hotkey readiness: managed by daemon")
+        return
+
+    try:
+        listener = HotkeyListener(hotkey=config.hotkey, mode=config.mode)
+    except HotkeyError as exc:
+        logger.warning("Hotkey readiness: %s", exc)
+        return
+
+    try:
+        if listener.start():
+            logger.info("Hotkey readiness: ready")
+        else:
+            logger.warning("Hotkey readiness: failed to start")
+    finally:
+        listener.stop()
 
 
 def setup_logging(level: str) -> None:

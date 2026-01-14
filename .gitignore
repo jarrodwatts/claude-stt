@@ -54,6 +54,7 @@ Thumbs.db
 .env.*
 .claude/settings.json
 .claude/*.local.json
+config.toml
 *.pem
 *.key
 secrets/
