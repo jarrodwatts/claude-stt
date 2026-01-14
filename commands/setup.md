@@ -70,32 +70,25 @@ python3 --version 2>/dev/null || python --version 2>/dev/null
 
 If verification shows 3.10+, proceed to Step 3. If it still fails, ask the user to check their PATH or restart their terminal.
 
-### Step 3: Check for uv (optional but recommended)
+### Step 3: Run Setup Script
 
-```bash
-command -v uv >/dev/null && echo "uv installed" || echo "uv not installed"
-```
-
-If uv is not installed, offer to install it (optional but recommended):
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-If user declines, proceed without uv - pip will work fine.
-
-### Step 4: Run Setup Script
-
-Once Python 3.10+ is confirmed, run the setup script:
+Once Python 3.10+ is confirmed, run the setup script using the detected Python command:
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/setup.py
 ```
 
-If `python3` doesn't work but `python` does (and is 3.10+):
-```bash
-python ${CLAUDE_PLUGIN_ROOT}/scripts/setup.py
-```
+(Use `python` instead of `python3` if that's what was detected in Step 1)
 
-### Step 5: Handle Common Errors
+The setup script will automatically:
+- Create a virtual environment
+- Install all dependencies
+- Download the speech recognition model
+- Start the daemon
+
+Wait for it to complete. This may take 1-2 minutes on first run.
+
+### Step 4: Handle Common Errors
 
 **"Permission denied" or Accessibility errors (macOS):**
 ```

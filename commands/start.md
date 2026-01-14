@@ -10,22 +10,39 @@ Start the speech-to-text daemon.
 
 When the user runs `/claude-stt:start`:
 
-1. Check if daemon is already running:
+### Step 1: Detect Python
+
+Find the working Python command:
 ```bash
-python ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon status
+python3 --version 2>/dev/null && echo "USE_PYTHON3" || python --version 2>/dev/null && echo "USE_PYTHON" || echo "NOT_FOUND"
 ```
 
-2. If not running, start it:
+- If output contains `USE_PYTHON3`, use `python3` for subsequent commands
+- If output contains `USE_PYTHON`, use `python` for subsequent commands
+- If output is `NOT_FOUND`, tell user: "Python not found. Please run `/claude-stt:setup` first."
+
+### Step 2: Check daemon status
+
+Using the detected Python command:
 ```bash
-python ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon start --background
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon status
+```
+(Replace `python3` with `python` if that's what was detected)
+
+### Step 3: Start if not running
+
+If daemon is not running:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon start --background
 ```
 
-3. Confirm it's running:
+### Step 4: Confirm and show usage
+
 ```bash
-python ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon status
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon status
 ```
 
-4. Show usage reminder:
+Show usage reminder:
 ```
 claude-stt daemon started.
 

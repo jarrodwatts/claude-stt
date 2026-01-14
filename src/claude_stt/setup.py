@@ -253,14 +253,16 @@ def _spawn_daemon(plugin_root: Path) -> bool:
         _print_info("Daemon already running.")
         return True
 
+    log_file = Config.get_config_dir() / "daemon.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
     env = os.environ.copy()
     env.setdefault("CLAUDE_PLUGIN_ROOT", str(plugin_root))
     cmd = [
         sys.executable,
         "-m",
         "claude_stt.daemon",
-        "start",
-        "--background",
+        "run",
     ]
 
     creationflags = 0
@@ -269,27 +271,29 @@ def _spawn_daemon(plugin_root: Path) -> bool:
         creationflags |= getattr(subprocess, "DETACHED_PROCESS", 0)
 
     try:
-        subprocess.Popen(
-            cmd,
-            cwd=str(plugin_root),
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL,
-            start_new_session=os.name != "nt",
-            creationflags=creationflags,
-        )
+        with open(log_file, "a", encoding="utf-8") as log_handle:
+            subprocess.Popen(
+                cmd,
+                cwd=str(plugin_root),
+                env=env,
+                stdout=log_handle,
+                stderr=log_handle,
+                stdin=subprocess.DEVNULL,
+                start_new_session=os.name != "nt",
+                creationflags=creationflags,
+            )
     except Exception:
         logging.getLogger(__name__).exception("Failed to start daemon")
         return False
 
-    for _ in range(20):
+    for _ in range(30):
         if is_daemon_running():
             _print_info("Daemon started.")
             return True
         time.sleep(0.1)
 
-    _print_warn("Daemon start not confirmed; run /claude-stt:start if needed.")
+    _print_warn(f"Daemon start not confirmed. Check logs: {log_file}")
+    _print_warn("Run /claude-stt:start to retry.")
     return False
 
 

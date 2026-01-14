@@ -10,9 +10,22 @@ Change claude-stt settings.
 
 When the user runs `/claude-stt:config`:
 
-1. Show current configuration:
+### Step 1: Detect Python
+
+Find the working Python command:
 ```bash
-python ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -c "
+python3 --version 2>/dev/null && echo "USE_PYTHON3" || python --version 2>/dev/null && echo "USE_PYTHON" || echo "NOT_FOUND"
+```
+
+- If output contains `USE_PYTHON3`, use `python3` for subsequent commands
+- If output contains `USE_PYTHON`, use `python` for subsequent commands
+- If output is `NOT_FOUND`, tell user: "Python not found. Please run `/claude-stt:setup` first."
+
+### Step 2: Show current configuration
+
+Using the detected Python command:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -c "
 from claude_stt.config import Config
 config = Config.load()
 print('Current Configuration:')
@@ -25,16 +38,20 @@ print(f'  Sound effects: {config.sound_effects}')
 print(f'  Max recording: {config.max_recording_seconds}s')
 "
 ```
+(Replace `python3` with `python` if that's what was detected)
 
-2. Ask user what they want to change:
-   - Hotkey (e.g., "ctrl+shift+space", "f9")
-   - Mode ("push-to-talk" or "toggle")
-   - Engine ("moonshine" or "whisper")
-   - Sound effects (on/off)
+### Step 3: Ask user what to change
 
-3. Update configuration:
+Options:
+- Hotkey (e.g., "ctrl+shift+space", "f9")
+- Mode ("push-to-talk" or "toggle")
+- Engine ("moonshine" or "whisper")
+- Sound effects (on/off)
+
+### Step 4: Update configuration
+
 ```bash
-python ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -c "
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -c "
 from claude_stt.config import Config
 config = Config.load()
 # Update fields as needed
@@ -44,10 +61,11 @@ print('Configuration saved.')
 "
 ```
 
-4. Restart daemon for changes to take effect:
+### Step 5: Restart daemon
+
 ```bash
-python ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon stop
-python ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon start --background
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon stop
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/exec.py -m claude_stt.daemon start --background
 ```
 
 ## Configuration Options

@@ -221,6 +221,47 @@ def _windows_pid_exists(pid: int) -> bool:
         return False
 
 
+def _spawn_background() -> bool:
+    """Spawn daemon in background using subprocess (all platforms)."""
+    log_file = Config.get_config_dir() / "daemon.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    env = os.environ.copy()
+    env.setdefault("CLAUDE_PLUGIN_ROOT", str(_get_plugin_root()))
+    cmd = [sys.executable, "-m", "claude_stt.daemon", "run"]
+
+    creationflags = 0
+    if os.name == "nt":
+        creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        creationflags |= getattr(subprocess, "DETACHED_PROCESS", 0)
+
+    try:
+        with open(log_file, "a", encoding="utf-8") as log_handle:
+            subprocess.Popen(
+                cmd,
+                env=env,
+                stdout=log_handle,
+                stderr=log_handle,
+                stdin=subprocess.DEVNULL,
+                start_new_session=(os.name != "nt"),
+                creationflags=creationflags,
+            )
+
+        for _ in range(30):
+            if is_daemon_running():
+                logging.getLogger(__name__).info("Daemon started in background.")
+                return True
+            time.sleep(0.1)
+
+        logging.getLogger(__name__).warning(
+            "Daemon did not start within 3 seconds. Check %s", log_file
+        )
+        return False
+    except Exception:
+        logging.getLogger(__name__).exception("Failed to spawn background daemon")
+        return False
+
+
 def start_daemon(background: bool = False):
     """Start the daemon.
 
@@ -231,32 +272,13 @@ def start_daemon(background: bool = False):
         logging.getLogger(__name__).info("Daemon is already running.")
         return
 
-    if background and os.name == "nt":
-        if _spawn_windows_background():
+    if background:
+        if _spawn_background():
             return
         logging.getLogger(__name__).warning(
-            "Background spawn failed on Windows; running in foreground"
+            "Background spawn failed; running in foreground"
         )
-        background = False
 
-    if background:
-        # Fork to background (Unix only)
-        if os.name != "nt":
-            try:
-                pid = os.fork()
-            except OSError as exc:
-                logging.getLogger(__name__).warning(
-                    "Background fork failed (%s); running in foreground", exc
-                )
-            else:
-                if pid > 0:
-                    # Parent process
-                    logging.getLogger(__name__).info("Daemon started with PID %s", pid)
-                    return
-                # Child process continues
-                os.setsid()
-
-    # Write PID file
     _write_pid_file(os.getpid())
 
     try:
@@ -264,29 +286,6 @@ def start_daemon(background: bool = False):
         daemon.run()
     finally:
         get_pid_file().unlink(missing_ok=True)
-
-
-def _spawn_windows_background() -> bool:
-    env = os.environ.copy()
-    env.setdefault("CLAUDE_PLUGIN_ROOT", str(_get_plugin_root()))
-    cmd = [sys.executable, "-m", "claude_stt.daemon", "run"]
-    creationflags = 0
-    creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    creationflags |= getattr(subprocess, "DETACHED_PROCESS", 0)
-    try:
-        subprocess.Popen(
-            cmd,
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL,
-            creationflags=creationflags,
-        )
-        logging.getLogger(__name__).info("Daemon started in background (Windows).")
-        return True
-    except Exception:
-        logging.getLogger(__name__).exception("Failed to spawn Windows background daemon")
-        return False
 
 
 def stop_daemon():
