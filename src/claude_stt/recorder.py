@@ -12,7 +12,7 @@ import numpy as np
 
 try:
     import sounddevice as sd
-except ImportError:
+except Exception:
     sd = None
 
 

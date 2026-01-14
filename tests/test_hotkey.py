@@ -2,12 +2,18 @@ import queue
 import time
 import unittest
 
-from pynput import keyboard
+try:
+    from pynput import keyboard
+    _PYNPUT_AVAILABLE = True
+except Exception:
+    keyboard = None
+    _PYNPUT_AVAILABLE = False
 
 from claude_stt.hotkey import HotkeyListener
 from claude_stt.errors import HotkeyError
 
 
+@unittest.skipUnless(_PYNPUT_AVAILABLE, "pynput unavailable in this environment")
 class HotkeyListenerTests(unittest.TestCase):
     def _next_event(self, events: "queue.Queue[str]", timeout: float = 0.5) -> str:
         return events.get(timeout=timeout)
