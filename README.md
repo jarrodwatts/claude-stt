@@ -5,8 +5,6 @@ Speech-to-text input for Claude Code. Hold a hotkey, speak, and your words appea
 [![License](https://img.shields.io/github/license/jarrodwatts/claude-stt)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/jarrodwatts/claude-stt)](https://github.com/jarrodwatts/claude-stt/stargazers)
 
-![Claude STT in action](claude-stt-preview.png)
-
 ## Install
 
 Inside a Claude Code instance, run the following commands:
