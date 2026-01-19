@@ -62,7 +62,7 @@ class WhisperEngine:
         try:
             if audio.dtype != np.float32:
                 audio = audio.astype(np.float32)
-            segments, _info = self._model.transcribe(audio, sample_rate=sample_rate)
+            segments, _info = self._model.transcribe(audio)
             text = " ".join(segment.text.strip() for segment in segments)
             return text.strip()
         except Exception:
