@@ -68,7 +68,7 @@ def _play_macos_sound(event: SoundEvent) -> None:
 
 
 def _play_linux_sound(event: SoundEvent) -> None:
-    """Play sound on Linux using paplay or aplay."""
+    """Play sound on Linux using pw-play, paplay, or aplay."""
     sound_file = LINUX_SOUNDS.get(event)
     if not sound_file:
         return
@@ -76,7 +76,16 @@ def _play_linux_sound(event: SoundEvent) -> None:
         _logger.debug("Sound file missing: %s", sound_file)
         return
 
-    # Try paplay first (PulseAudio/PipeWire)
+    # Try pw-play first (PipeWire native)
+    if shutil.which("pw-play"):
+        subprocess.Popen(
+            ["pw-play", sound_file],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return
+
+    # Try paplay (PulseAudio)
     if shutil.which("paplay"):
         subprocess.Popen(
             ["paplay", sound_file],
@@ -85,7 +94,7 @@ def _play_linux_sound(event: SoundEvent) -> None:
         )
         return
 
-    # Fall back to aplay (ALSA)
+    # Fall back to aplay (ALSA) - note: may not support .oga files
     if shutil.which("aplay"):
         subprocess.Popen(
             ["aplay", "-q", sound_file],
