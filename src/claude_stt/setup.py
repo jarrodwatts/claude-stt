@@ -163,7 +163,11 @@ def _check_clipboard() -> bool:
         )
         return False
 
-    if hasattr(pyperclip, "is_available") and not pyperclip.is_available():
+    # Attempt copy to trigger pyperclip's lazy detection and verify it works.
+    # Note: is_available() returns False before any copy/paste call until asweigart/pyperclip#289 is fixed
+    try:
+        pyperclip.copy('')
+    except pyperclip.PyperclipException:
         platform = get_platform()
         if platform == "linux":
             _print_warn(
