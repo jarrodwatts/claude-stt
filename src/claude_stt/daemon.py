@@ -19,6 +19,8 @@ from .hotkey import HotkeyListener
 from .keyboard import test_injection
 from .daemon_service import STTDaemon
 
+logger = logging.getLogger(__name__)
+
 
 def get_pid_file() -> Path:
     """Get the PID file path."""
@@ -40,7 +42,7 @@ def _read_pid_file() -> Optional[dict]:
     try:
         raw = pid_file.read_text(encoding="utf-8", errors="replace").strip()
     except Exception:
-        logging.getLogger(__name__).debug("Failed to read PID file", exc_info=True)
+        logger.debug("Failed to read PID file", exc_info=True)
         return None
     if not raw:
         return None
@@ -106,7 +108,7 @@ def is_daemon_running() -> bool:
         if command is None:
             return True
         if "claude-stt" not in command and "claude_stt" not in command:
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "PID file points to non-claude-stt process; removing stale PID file"
             )
             pid_file.unlink(missing_ok=True)
@@ -130,7 +132,7 @@ def _get_process_command(pid: int) -> Optional[str]:
             command = " ".join(part for part in raw.split("\x00") if part)
             return command or None
         except Exception:
-            logging.getLogger(__name__).debug("Failed to read /proc cmdline", exc_info=True)
+            logger.debug("Failed to read /proc cmdline", exc_info=True)
 
     result = subprocess.run(
         ["ps", "-p", str(pid), "-o", "command="],
@@ -159,7 +161,7 @@ def _get_windows_process_command(pid: int) -> Optional[str]:
     except FileNotFoundError:
         pass
     except Exception:
-        logging.getLogger(__name__).debug("wmic lookup failed", exc_info=True)
+        logger.debug("wmic lookup failed", exc_info=True)
 
     try:
         result = subprocess.run(
@@ -177,7 +179,7 @@ def _get_windows_process_command(pid: int) -> Optional[str]:
     except FileNotFoundError:
         return None
     except Exception:
-        logging.getLogger(__name__).debug("PowerShell lookup failed", exc_info=True)
+        logger.debug("PowerShell lookup failed", exc_info=True)
         return None
     if result.returncode != 0:
         return None
@@ -249,16 +251,16 @@ def _spawn_background() -> bool:
 
         for _ in range(30):
             if is_daemon_running():
-                logging.getLogger(__name__).info("Daemon started in background.")
+                logger.info("Daemon started in background.")
                 return True
             time.sleep(0.1)
 
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "Daemon did not start within 3 seconds. Check %s", log_file
         )
         return False
     except Exception:
-        logging.getLogger(__name__).exception("Failed to spawn background daemon")
+        logger.exception("Failed to spawn background daemon")
         return False
 
 
@@ -269,13 +271,13 @@ def start_daemon(background: bool = False):
         background: If True, daemonize the process.
     """
     if is_daemon_running():
-        logging.getLogger(__name__).info("Daemon is already running.")
+        logger.info("Daemon is already running.")
         return
 
     if background:
         if _spawn_background():
             return
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "Background spawn failed; running in foreground"
         )
 
@@ -288,11 +290,34 @@ def start_daemon(background: bool = False):
         get_pid_file().unlink(missing_ok=True)
 
 
+def toggle_recording():
+    """Toggle recording on/off by sending SIGUSR1 to the daemon."""
+    data = _read_pid_file()
+    if not data:
+        logger.error("Daemon is not running.")
+        return False
+
+    try:
+        pid = int(data["pid"])
+        if not _pid_exists(pid):
+            logger.error("Daemon is not running.")
+            return False
+        os.kill(pid, signal.SIGUSR1)
+        logger.info("Sent toggle signal to daemon (PID %s)", pid)
+        return True
+    except PermissionError:
+        logger.error("Permission denied sending signal to daemon")
+        return False
+    except OSError as e:
+        logger.error("Failed to send signal: %s", e)
+        return False
+
+
 def stop_daemon():
     """Stop the running daemon."""
     data = _read_pid_file()
     if not data:
-        logging.getLogger(__name__).info("Daemon is not running.")
+        logger.info("Daemon is not running.")
         return
 
     pid_file = get_pid_file()
@@ -300,35 +325,35 @@ def stop_daemon():
         pid = int(data["pid"])
         command = _get_process_command(pid)
         if command is not None and not _pid_looks_like_claude_stt(pid):
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "PID %s does not look like claude-stt; refusing to kill", pid
             )
             pid_file.unlink(missing_ok=True)
             return
         if not _terminate_process(pid):
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "Failed to signal daemon (PID %s); leaving PID file intact", pid
             )
             return
-        logging.getLogger(__name__).info("Sent stop signal to daemon (PID %s)", pid)
+        logger.info("Sent stop signal to daemon (PID %s)", pid)
 
         # Wait for it to stop
         for _ in range(50):  # 5 seconds
             time.sleep(0.1)
             if not _pid_exists(pid):
-                logging.getLogger(__name__).info("Daemon stopped.")
+                logger.info("Daemon stopped.")
                 break
         else:
-            logging.getLogger(__name__).warning("Daemon did not stop gracefully, forcing...")
+            logger.warning("Daemon did not stop gracefully, forcing...")
             _force_kill(pid)
 
     except PermissionError:
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "Permission denied stopping daemon (PID %s); leaving PID file intact", pid
         )
         return
     except (ValueError, OSError):
-        logging.getLogger(__name__).info("Daemon is not running.")
+        logger.info("Daemon is not running.")
         pid_file.unlink(missing_ok=True)
     else:
         pid_file.unlink(missing_ok=True)
@@ -354,7 +379,7 @@ def _force_kill(pid: int) -> None:
     try:
         os.kill(pid, kill_signal)
     except OSError:
-        logging.getLogger(__name__).debug("Force kill failed", exc_info=True)
+        logger.debug("Force kill failed", exc_info=True)
 
 
 def _taskkill(pid: int, force: bool) -> bool:
@@ -369,13 +394,12 @@ def _taskkill(pid: int, force: bool) -> bool:
     except FileNotFoundError:
         return False
     except Exception:
-        logging.getLogger(__name__).debug("taskkill failed", exc_info=True)
+        logger.debug("taskkill failed", exc_info=True)
         return False
 
 
 def daemon_status():
     """Print daemon status."""
-    logger = logging.getLogger(__name__)
     running = is_daemon_running()
     if running:
         data = _read_pid_file()
@@ -438,7 +462,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="claude-stt daemon")
     parser.add_argument(
         "command",
-        choices=["start", "stop", "status", "run"],
+        choices=["start", "stop", "status", "run", "toggle"],
         help="Command to execute",
     )
     parser.add_argument(
@@ -455,15 +479,18 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
     setup_logging(args.log_level)
 
-    if args.command == "start":
-        start_daemon(background=args.background)
-    elif args.command == "stop":
-        stop_daemon()
-    elif args.command == "status":
-        daemon_status()
-    elif args.command == "run":
-        # Run in foreground (for debugging)
-        start_daemon(background=False)
+    match args.command:
+        case "start":
+            start_daemon(background=args.background)
+        case "stop":
+            stop_daemon()
+        case "status":
+            daemon_status()
+        case "run":
+            start_daemon(background=False)
+        case "toggle":
+            if not toggle_recording():
+                return 1
     return 0
 
 

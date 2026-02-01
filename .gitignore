@@ -82,3 +82,6 @@ temp/
 # ralph
 .agents/
 .ralph/
+
+# Local environment
+.env

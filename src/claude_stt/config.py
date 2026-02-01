@@ -40,6 +40,7 @@ class Config:
     # Audio settings
     sample_rate: int = 16000
     max_recording_seconds: int = 300  # 5 minutes
+    audio_device: str | int | None = None  # None = system default
 
     # Output settings
     output_mode: Literal["injection", "clipboard", "auto"] = "auto"
@@ -57,6 +58,7 @@ class Config:
 
     @classmethod
     def _legacy_config_path(cls) -> Path | None:
+        """Get legacy config path if it exists."""
         plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
         if not plugin_root:
             return None
@@ -98,6 +100,7 @@ class Config:
                 max_recording_seconds=stt_config.get(
                     "max_recording_seconds", cls.max_recording_seconds
                 ),
+                audio_device=stt_config.get("audio_device", cls.audio_device),
                 output_mode=stt_config.get("output_mode", cls.output_mode),
                 sound_effects=stt_config.get("sound_effects", cls.sound_effects),
             )
@@ -134,6 +137,7 @@ class Config:
                 "whisper_model": self.whisper_model,
                 "sample_rate": self.sample_rate,
                 "max_recording_seconds": self.max_recording_seconds,
+                "audio_device": self.audio_device,
                 "output_mode": self.output_mode,
                 "sound_effects": self.sound_effects,
             }
@@ -226,14 +230,11 @@ class Config:
 
 def get_platform() -> str:
     """Get the current platform identifier."""
-    system = platform.system()
-    if system == "Darwin":
-        return "macos"
-    elif system == "Linux":
-        return "linux"
-    elif system == "Windows":
-        return "windows"
-    return "unknown"
+    return {
+        "Darwin": "macos",
+        "Linux": "linux",
+        "Windows": "windows",
+    }.get(platform.system(), "unknown")
 
 
 def is_wayland() -> bool:

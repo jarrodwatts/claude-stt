@@ -28,6 +28,7 @@ class RecorderConfig:
     dtype: str = "float32"
     queue_maxsize: int = 32
     max_recording_seconds: Optional[int] = None
+    device: Optional[int | str] = None  # None = system default
 
 
 @dataclass
@@ -61,9 +62,10 @@ class AudioRecorder:
         self._logger = logging.getLogger(__name__)
 
     def _compute_max_chunks(self) -> Optional[int]:
-        if not self.config.max_recording_seconds:
+        max_seconds = self.config.max_recording_seconds
+        if not max_seconds:
             return None
-        max_seconds = max(1, int(self.config.max_recording_seconds))
+        max_seconds = max(1, int(max_seconds))
         chunks = max_seconds * self.config.sample_rate / self.config.blocksize
         return max(1, int(math.ceil(chunks)))
 
@@ -111,10 +113,9 @@ class AudioRecorder:
 
         try:
             self._audio_queue = queue.Queue(maxsize=self.config.queue_maxsize)
-            if self._max_chunks:
-                self._recorded_chunks = deque(maxlen=self._max_chunks)
-            else:
-                self._recorded_chunks = deque()
+            self._recorded_chunks = (
+                deque(maxlen=self._max_chunks) if self._max_chunks else deque()
+            )
 
             def callback(indata, frames, time_info, status):
                 if status:
@@ -131,6 +132,7 @@ class AudioRecorder:
                 channels=self.config.channels,
                 dtype=self.config.dtype,
                 blocksize=self.config.blocksize,
+                device=self.config.device,
                 callback=callback,
             )
             self._stream.start()

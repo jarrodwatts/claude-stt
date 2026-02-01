@@ -1,6 +1,8 @@
 """Keyboard output: direct injection or clipboard fallback."""
 
 import logging
+import shutil
+import subprocess
 import time
 from typing import Optional
 
@@ -48,6 +50,41 @@ def _warn_pynput_missing() -> None:
     _pynput_warned = True
 
 
+def _has_wtype() -> bool:
+    """Check if wtype is available for Wayland text input."""
+    return shutil.which("wtype") is not None
+
+
+def _output_via_wtype(text: str, config: Config) -> bool:
+    """Output text using wtype (Wayland).
+
+    Args:
+        text: The text to type.
+        config: Configuration.
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["wtype", "--", text],
+            capture_output=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            if config.sound_effects:
+                play_sound("complete")
+            return True
+        _logger.warning("wtype failed: %s", result.stderr.decode(errors="replace"))
+        return False
+    except subprocess.TimeoutExpired:
+        _logger.warning("wtype timed out")
+        return False
+    except Exception:
+        _logger.warning("wtype failed", exc_info=True)
+        return False
+
+
 def test_injection() -> bool:
     """Test if keyboard injection works.
 
@@ -59,6 +96,8 @@ def test_injection() -> bool:
     """
     global _injection_capable, _injection_checked_at
     now = time.monotonic()
+
+    # Return cached result if still valid
     if (
         _injection_capable is not None
         and _injection_checked_at is not None
@@ -66,30 +105,27 @@ def test_injection() -> bool:
     ):
         return _injection_capable
 
-    # On Wayland, injection typically doesn't work
-    if is_wayland():
-        _injection_capable = False
+    def cache_result(capable: bool) -> bool:
+        global _injection_capable, _injection_checked_at
+        _injection_capable = capable
         _injection_checked_at = now
-        return _injection_capable
+        return capable
+
+    # On Wayland, check for wtype
+    if is_wayland():
+        return cache_result(_has_wtype())
 
     if not _PYNPUT_AVAILABLE:
         _warn_pynput_missing()
-        _injection_capable = False
-        _injection_checked_at = now
-        return _injection_capable
+        return cache_result(False)
 
     try:
         kb = get_keyboard()
-        # Try a simple key press/release
         kb.press(Key.shift)
         kb.release(Key.shift)
-        _injection_capable = True
-        _injection_checked_at = now
-        return _injection_capable
+        return cache_result(True)
     except Exception:
-        _injection_capable = False
-        _injection_checked_at = now
-        return _injection_capable
+        return cache_result(False)
 
 
 def output_text(
@@ -116,13 +152,14 @@ def output_text(
         mode = "injection" if test_injection() else "clipboard"
         _logger.debug("Output mode auto-selected: %s", mode)
 
-    if mode == "injection":
-        if not _PYNPUT_AVAILABLE:
-            _warn_pynput_missing()
-            return _output_via_clipboard(text, config)
-        return _output_via_injection(text, window_info, config)
-    else:
+    if mode != "injection":
         return _output_via_clipboard(text, config)
+
+    if not _PYNPUT_AVAILABLE:
+        _warn_pynput_missing()
+        return _output_via_clipboard(text, config)
+
+    return _output_via_injection(text, window_info, config)
 
 
 def _output_via_injection(
@@ -141,6 +178,13 @@ def _output_via_injection(
         True if successful, False otherwise.
     """
     try:
+        # On Wayland, use wtype
+        if is_wayland():
+            if _has_wtype():
+                return _output_via_wtype(text, config)
+            _logger.warning("wtype not available; falling back to clipboard")
+            return _output_via_clipboard(text, config)
+
         if not _PYNPUT_AVAILABLE:
             _warn_pynput_missing()
             return _output_via_clipboard(text, config)

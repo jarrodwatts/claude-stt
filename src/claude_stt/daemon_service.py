@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import logging
 import queue
+import signal
 import threading
 import time
 from typing import Optional
+
+import numpy as np
 
 from .config import Config
 from .engine_factory import build_engine
@@ -60,10 +63,23 @@ class STTDaemon:
                 RecorderConfig(
                     sample_rate=self.config.sample_rate,
                     max_recording_seconds=self.config.max_recording_seconds,
+                    device=self.config.audio_device,
                 )
             )
             if not self._recorder.is_available():
                 raise RecorderError("No audio input device available")
+
+            # Log audio device
+            try:
+                import sounddevice as sd
+                if self.config.audio_device is not None:
+                    device_info = sd.query_devices(self.config.audio_device)
+                    self._logger.info("Audio input: [%s] %s", self.config.audio_device, device_info['name'])
+                else:
+                    device_info = sd.query_devices(kind='input')
+                    self._logger.info("Audio input: %s (default)", device_info['name'])
+            except Exception:
+                pass
 
             self._engine = build_engine(self.config)
             if not self._engine.is_available():
@@ -109,6 +125,10 @@ class STTDaemon:
             if not self._engine:
                 continue
 
+            # Log audio level
+            rms = np.sqrt(np.mean(audio**2))
+            db = 20 * np.log10(max(rms, 1e-10))
+            self._logger.info("Transcribing audio (%d samples, %.1f dB)...", len(audio), db)
             try:
                 text = self._engine.transcribe(audio, self.config.sample_rate)
             except Exception:
@@ -116,11 +136,16 @@ class STTDaemon:
                 continue
 
             text = text.strip()
-            if text:
-                if not output_text(text, window_info, self.config):
-                    self._logger.warning("Failed to output transcription")
-            elif self.config.sound_effects:
-                play_sound("warning")
+            if not text:
+                self._logger.info("No speech detected")
+                if self.config.sound_effects:
+                    play_sound("warning")
+                continue
+
+            display_text = text[:100] + "..." if len(text) > 100 else text
+            self._logger.info("Transcribed: %s", display_text)
+            if not output_text(text, window_info, self.config):
+                self._logger.warning("Failed to output transcription")
 
     def _on_recording_start(self):
         """Called when recording should start."""
@@ -136,6 +161,7 @@ class STTDaemon:
 
             # Start recording
             if self._recorder and self._recorder.start():
+                self._logger.info("Recording started")
                 if self.config.sound_effects:
                     play_sound("start")
             else:
@@ -153,12 +179,14 @@ class STTDaemon:
                 return
 
             self._recording = False
+            elapsed = time.time() - self._record_start_time
 
             # Stop recording
             if self._recorder:
                 audio = self._recorder.stop()
             window_info = self._original_window
 
+            self._logger.info("Recording stopped (%.1fs)", elapsed)
             if self.config.sound_effects:
                 play_sound("stop")
 
@@ -171,7 +199,7 @@ class STTDaemon:
         elif self.config.sound_effects:
             play_sound("warning")
 
-    def _check_max_recording_time(self):
+    def _check_max_recording_time(self) -> None:
         """Check if max recording time has been reached."""
         if not self._recording:
             return
@@ -179,13 +207,11 @@ class STTDaemon:
         elapsed = time.time() - self._record_start_time
         max_seconds = self.config.max_recording_seconds
 
-        if max_seconds > 30:
-            # Warning at 30 seconds before max
-            if elapsed >= max_seconds - 30 and elapsed < max_seconds - 29:
-                if self.config.sound_effects:
-                    play_sound("warning")
+        # Warning at 30 seconds before max
+        if max_seconds > 30 and max_seconds - 30 <= elapsed < max_seconds - 29:
+            if self.config.sound_effects:
+                play_sound("warning")
 
-        # Auto-stop at max
         if elapsed >= max_seconds:
             self._on_recording_stop()
 
@@ -219,11 +245,18 @@ class STTDaemon:
             self._logger.info("Shutting down...")
             self._running = False
 
-        try:
-            import signal
+        def toggle_recording(signum, frame):
+            if self._recording:
+                self._logger.info("SIGUSR1: stopping recording")
+                self._on_recording_stop()
+            else:
+                self._logger.info("SIGUSR1: starting recording")
+                self._on_recording_start()
 
+        try:
             signal.signal(signal.SIGINT, shutdown)
             signal.signal(signal.SIGTERM, shutdown)
+            signal.signal(signal.SIGUSR1, toggle_recording)
         except Exception:
             self._logger.debug("Signal handlers unavailable", exc_info=True)
 
