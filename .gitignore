@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+.python-version
 *.py[cod]
 *$py.class
 *.so
@@ -83,5 +84,3 @@ temp/
 .agents/
 .ralph/
 
-# Local environment
-.env
