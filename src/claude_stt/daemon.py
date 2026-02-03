@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 import os
+import platform
 import signal
 import subprocess
 import sys
@@ -245,7 +246,8 @@ def _spawn_background() -> bool:
                 stdout=log_handle,
                 stderr=log_handle,
                 stdin=subprocess.DEVNULL,
-                start_new_session=(os.name != "nt"),
+                # Linux/X11 hotkeys fail if we detach into a new session.
+                start_new_session=(os.name != "nt" and platform.system() == "Darwin"),
                 creationflags=creationflags,
             )
 
