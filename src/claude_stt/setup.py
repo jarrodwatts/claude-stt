@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Sequence
 
-from .config import Config, get_platform, is_wayland
+from .config import Config, get_platform, is_wayland, is_wsl
 from .daemon import is_daemon_running
 from .engine_factory import build_engine
 from .errors import EngineError, HotkeyError
@@ -203,6 +203,9 @@ def _check_platform_requirements() -> None:
             "System Settings > Privacy & Security > Accessibility."
         )
     elif platform == "linux":
+        if is_wsl():
+            _print_warn("WSL detected; global hotkeys and window focus are not supported.")
+            _print_warn("Use native Windows or a full Linux desktop session.")
         if is_wayland():
             _print_warn("Wayland detected; hotkeys/injection may be limited.")
         if shutil.which("xdotool") is None:
