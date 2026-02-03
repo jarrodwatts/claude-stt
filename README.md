@@ -82,7 +82,7 @@ Customize your settings anytime:
 | `hotkey` | Key combo | `ctrl+shift+space` | Trigger recording |
 | `mode` | `toggle`, `push-to-talk` | `toggle` | Press to toggle vs hold to record |
 | `engine` | `moonshine`, `whisper` | `moonshine` | STT engine |
-| `moonshine_model` | `moonshine/tiny`, `moonshine/base` | `moonshine/base` | Model size |
+| `moonshine_model` | `moonshine/tiny`, `moonshine/base`, other Moonshine model IDs | `moonshine/base` | Model size |
 | `output_mode` | `auto`, `injection`, `clipboard` | `auto` | How text is inserted |
 | `sound_effects` | `true`, `false` | `true` | Play audio feedback |
 | `max_recording_seconds` | 1-600 | 300 | Maximum recording duration |

@@ -17,7 +17,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.mode, "toggle")
         self.assertEqual(config.engine, "moonshine")
         self.assertEqual(config.output_mode, "auto")
-        self.assertEqual(config.moonshine_model, "moonshine/base")
+        self.assertEqual(config.moonshine_model, "moonshine/huge")
         self.assertEqual(config.max_recording_seconds, 1)
         self.assertEqual(config.sample_rate, 16000)
 

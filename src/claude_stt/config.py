@@ -178,12 +178,14 @@ class Config:
             logger.warning("Invalid engine '%s'; defaulting to 'moonshine'", self.engine)
             self.engine = "moonshine"
 
-        if self.moonshine_model not in ("moonshine/tiny", "moonshine/base"):
+        if not isinstance(self.moonshine_model, str) or not self.moonshine_model.strip():
+            logger.warning("Invalid moonshine_model; defaulting to 'moonshine/base'")
+            self.moonshine_model = "moonshine/base"
+        elif self.moonshine_model not in ("moonshine/tiny", "moonshine/base"):
             logger.warning(
-                "Invalid moonshine_model '%s'; defaulting to 'moonshine/base'",
+                "Unknown moonshine_model '%s'; using as provided",
                 self.moonshine_model,
             )
-            self.moonshine_model = "moonshine/base"
 
         if not isinstance(self.whisper_model, str) or not self.whisper_model.strip():
             logger.warning("Invalid whisper_model; defaulting to 'medium'")
