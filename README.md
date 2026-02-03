@@ -102,7 +102,7 @@ Settings stored in `~/.claude/plugins/claude-stt/config.toml`.
 | Platform | Additional Requirements |
 |----------|------------------------|
 | **macOS** | Accessibility permissions (System Settings > Privacy & Security) |
-| **Linux** | xdotool for window management; X11 recommended (Wayland has limitations) |
+| **Linux** | xdotool for window management; X11 recommended (Wayland has limitations); WSL not supported |
 | **Windows** | pywin32 for window tracking |
 
 ---
@@ -137,6 +137,7 @@ claude-stt start --background
 | Whisper dependencies missing | Run `/claude-stt:setup --with-whisper`, or `uv sync --directory $CLAUDE_PLUGIN_ROOT --extra whisper`, or `python $CLAUDE_PLUGIN_ROOT/scripts/exec.py -m pip install .[whisper]` |
 | Hotkey not triggering | Check for conflicts with other apps. Try `/claude-stt:config` to change hotkey |
 | Text going to wrong window | Plugin tracks original window — ensure Claude Code was focused when recording started |
+| Running under WSL | Not supported; use native Windows or Linux |
 
 ### Logging
 

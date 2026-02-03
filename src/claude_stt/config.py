@@ -244,3 +244,15 @@ def is_wayland() -> bool:
     if get_platform() != "linux":
         return False
     return os.environ.get("XDG_SESSION_TYPE") == "wayland"
+
+
+def is_wsl() -> bool:
+    """Check if running under Windows Subsystem for Linux."""
+    if get_platform() != "linux":
+        return False
+    if os.environ.get("WSL_DISTRO_NAME") or os.environ.get("WSL_INTEROP"):
+        return True
+    try:
+        return "microsoft" in Path("/proc/version").read_text().lower()
+    except OSError:
+        return False
