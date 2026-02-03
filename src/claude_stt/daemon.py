@@ -230,12 +230,18 @@ def _spawn_background() -> bool:
 
     env = os.environ.copy()
     env.setdefault("CLAUDE_PLUGIN_ROOT", str(_get_plugin_root()))
-    cmd = [sys.executable, "-m", "claude_stt.daemon", "run"]
+    python_exe = sys.executable
+    if os.name == "nt":
+        pythonw = Path(sys.executable).parent / "pythonw.exe"
+        if pythonw.exists():
+            python_exe = str(pythonw)
+    cmd = [python_exe, "-m", "claude_stt.daemon", "run"]
 
     creationflags = 0
     if os.name == "nt":
         creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         creationflags |= getattr(subprocess, "DETACHED_PROCESS", 0)
+        creationflags |= getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
 
     try:
         with open(log_file, "a", encoding="utf-8") as log_handle:
