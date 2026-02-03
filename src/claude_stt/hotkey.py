@@ -172,6 +172,15 @@ class HotkeyListener:
             return keyboard.KeyCode.from_char(key.char.lower())
 
         if hasattr(key, "vk") and key.vk is not None:
+            # Normalize KeyCode(vk=...) to Key enum when possible (Linux/X11).
+            try:
+                for member in keyboard.Key:
+                    value = getattr(member, "value", None)
+                    if hasattr(value, "vk") and value.vk == key.vk:
+                        return member
+            except Exception:
+                pass
+
             if platform.system() == "Darwin":
                 mac_vk_map = {
                     49: keyboard.Key.space,
