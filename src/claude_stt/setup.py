@@ -164,9 +164,16 @@ def _check_clipboard() -> bool:
         return False
 
     # Attempt copy to trigger pyperclip's lazy detection and verify it works.
-    # Note: is_available() returns False before any copy/paste call until asweigart/pyperclip#289 is fixed
+    # Note: is_available() returns False before any copy/paste call until asweigart/pyperclip#289 is fixed.
+    previous_clipboard = None
+    probe_succeeded = False
     try:
-        pyperclip.copy('')
+        try:
+            previous_clipboard = pyperclip.paste()
+        except pyperclip.PyperclipException:
+            previous_clipboard = None
+        pyperclip.copy("")
+        probe_succeeded = True
     except pyperclip.PyperclipException:
         platform = get_platform()
         if platform == "linux":
@@ -176,6 +183,12 @@ def _check_clipboard() -> bool:
         else:
             _print_warn("Clipboard backend unavailable on this system.")
         return False
+    finally:
+        if probe_succeeded and previous_clipboard is not None:
+            try:
+                pyperclip.copy(previous_clipboard)
+            except pyperclip.PyperclipException:
+                pass
 
     return True
 
