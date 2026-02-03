@@ -1,6 +1,6 @@
 """STT engine implementations."""
 
-from typing import Protocol, Optional
+from typing import Protocol
 import numpy as np
 
 
