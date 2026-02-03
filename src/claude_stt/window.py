@@ -234,7 +234,18 @@ def _restore_windows_focus(window_info: WindowInfo) -> bool:
             return False
 
         # Show and activate the window
-        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        SW_SHOW = 5
+        SW_SHOWMAXIMIZED = 3
+        SW_RESTORE = 9
+
+        if user32.IsIconic(hwnd):
+            show_flag = SW_RESTORE
+        elif user32.IsZoomed(hwnd):
+            show_flag = SW_SHOWMAXIMIZED
+        else:
+            show_flag = SW_SHOW
+
+        user32.ShowWindow(hwnd, show_flag)
         if not user32.SetForegroundWindow(hwnd):
             return False
 
