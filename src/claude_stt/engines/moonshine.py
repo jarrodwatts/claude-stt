@@ -28,13 +28,17 @@ class MoonshineEngine:
         - moonshine/base: ~400MB, better accuracy
     """
 
-    def __init__(self, model_name: str = "moonshine/base"):
+    def __init__(self, model_name: str = "moonshine/base", models_dir: str | None = None):
         """Initialize the Moonshine engine.
 
         Args:
             model_name: Model to use ("moonshine/tiny" or "moonshine/base").
+            models_dir: Local directory containing ONNX model files.
+                        When set, loads models from this path instead of
+                        downloading from HuggingFace.
         """
         self.model_name = model_name
+        self.models_dir = models_dir
         self._model: Optional[object] = None
         self._logger = logging.getLogger(__name__)
 
@@ -57,7 +61,10 @@ class MoonshineEngine:
             return True
 
         try:
-            self._model = _MoonshineModel(model_name=self.model_name)
+            kwargs = {"model_name": self.model_name}
+            if self.models_dir is not None:
+                kwargs["models_dir"] = self.models_dir
+            self._model = _MoonshineModel(**kwargs)
             return True
         except Exception:
             self._logger.exception("Failed to load Moonshine model")

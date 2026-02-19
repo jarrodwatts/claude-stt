@@ -35,6 +35,7 @@ class Config:
     # Engine settings
     engine: Literal["moonshine", "whisper"] = "moonshine"
     moonshine_model: str = "moonshine/base"
+    moonshine_models_dir: str | None = None  # Local ONNX model directory path
     whisper_model: str = "medium"
 
     # Audio settings
@@ -95,6 +96,7 @@ class Config:
                 mode=stt_config.get("mode", cls.mode),
                 engine=stt_config.get("engine", cls.engine),
                 moonshine_model=stt_config.get("moonshine_model", cls.moonshine_model),
+                moonshine_models_dir=stt_config.get("moonshine_models_dir", cls.moonshine_models_dir),
                 whisper_model=stt_config.get("whisper_model", cls.whisper_model),
                 sample_rate=stt_config.get("sample_rate", cls.sample_rate),
                 max_recording_seconds=stt_config.get(
@@ -128,8 +130,7 @@ class Config:
         config_path = self.get_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        data = {
-            "claude-stt": {
+        stt_data: dict = {
                 "hotkey": self.hotkey,
                 "mode": self.mode,
                 "engine": self.engine,
@@ -137,11 +138,16 @@ class Config:
                 "whisper_model": self.whisper_model,
                 "sample_rate": self.sample_rate,
                 "max_recording_seconds": self.max_recording_seconds,
-                "audio_device": self.audio_device,
                 "output_mode": self.output_mode,
                 "sound_effects": self.sound_effects,
-            }
         }
+        # TOML cannot serialize None; only include optional fields when set
+        if self.moonshine_models_dir is not None:
+            stt_data["moonshine_models_dir"] = self.moonshine_models_dir
+        if self.audio_device is not None:
+            stt_data["audio_device"] = self.audio_device
+
+        data = {"claude-stt": stt_data}
 
         temp_file = None
         try:
@@ -186,6 +192,15 @@ class Config:
                 "Unknown moonshine_model '%s'; using as provided",
                 self.moonshine_model,
             )
+
+        if self.moonshine_models_dir is not None:
+            expanded = Path(self.moonshine_models_dir).expanduser().resolve()
+            self.moonshine_models_dir = str(expanded)
+            if not expanded.is_dir():
+                logger.warning(
+                    "moonshine_models_dir '%s' does not exist; model loading may fail",
+                    self.moonshine_models_dir,
+                )
 
         if not isinstance(self.whisper_model, str) or not self.whisper_model.strip():
             logger.warning("Invalid whisper_model; defaulting to 'medium'")
