@@ -1,3 +1,5 @@
+> **Archived:** This project is no longer maintained. Native voice/STT support has been added to Claude Code via the `/voice` command.
+
 # Claude STT
 
 Speech-to-text input for Claude Code. Hold a hotkey, speak, and your words appear in the input field — all processed locally.
