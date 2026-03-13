@@ -1,4 +1,8 @@
-> **Archived:** This project is no longer maintained. Native voice/STT support has been added to Claude Code via the `/voice` command.
+# 🚨 This project is archived
+
+Native voice/STT support has been officially added to Claude Code via the `/voice` command — use that instead. This repo is no longer maintained.
+
+---
 
 # Claude STT
 
