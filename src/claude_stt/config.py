@@ -128,20 +128,20 @@ class Config:
         config_path = self.get_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
-        data = {
-            "claude-stt": {
-                "hotkey": self.hotkey,
-                "mode": self.mode,
-                "engine": self.engine,
-                "moonshine_model": self.moonshine_model,
-                "whisper_model": self.whisper_model,
-                "sample_rate": self.sample_rate,
-                "max_recording_seconds": self.max_recording_seconds,
-                "audio_device": self.audio_device,
-                "output_mode": self.output_mode,
-                "sound_effects": self.sound_effects,
-            }
+        section = {
+            "hotkey": self.hotkey,
+            "mode": self.mode,
+            "engine": self.engine,
+            "moonshine_model": self.moonshine_model,
+            "whisper_model": self.whisper_model,
+            "sample_rate": self.sample_rate,
+            "max_recording_seconds": self.max_recording_seconds,
+            "output_mode": self.output_mode,
+            "sound_effects": self.sound_effects,
         }
+        if self.audio_device is not None:
+            section["audio_device"] = self.audio_device
+        data = {"claude-stt": section}
 
         temp_file = None
         try:
@@ -174,7 +174,7 @@ class Config:
             logger.warning("Invalid mode '%s'; defaulting to 'toggle'", self.mode)
             self.mode = "toggle"
 
-        if self.engine not in ("moonshine", "whisper"):
+        if self.engine not in ("moonshine", "whisper", "whisper-cli"):
             logger.warning("Invalid engine '%s'; defaulting to 'moonshine'", self.engine)
             self.engine = "moonshine"
 
