@@ -33,9 +33,10 @@ class Config:
     mode: Literal["push-to-talk", "toggle"] = "toggle"
 
     # Engine settings
-    engine: Literal["moonshine", "whisper"] = "moonshine"
+    engine: Literal["moonshine", "whisper", "mlx-whisper"] = "moonshine"
     moonshine_model: str = "moonshine/base"
     whisper_model: str = "medium"
+    mlx_whisper_model: str = "mlx-community/whisper-large-v3-mlx"
 
     # Audio settings
     sample_rate: int = 16000
@@ -96,6 +97,7 @@ class Config:
                 engine=stt_config.get("engine", cls.engine),
                 moonshine_model=stt_config.get("moonshine_model", cls.moonshine_model),
                 whisper_model=stt_config.get("whisper_model", cls.whisper_model),
+                mlx_whisper_model=stt_config.get("mlx_whisper_model", cls.mlx_whisper_model),
                 sample_rate=stt_config.get("sample_rate", cls.sample_rate),
                 max_recording_seconds=stt_config.get(
                     "max_recording_seconds", cls.max_recording_seconds
@@ -135,6 +137,7 @@ class Config:
                 "engine": self.engine,
                 "moonshine_model": self.moonshine_model,
                 "whisper_model": self.whisper_model,
+                "mlx_whisper_model": self.mlx_whisper_model,
                 "sample_rate": self.sample_rate,
                 "max_recording_seconds": self.max_recording_seconds,
                 "audio_device": self.audio_device,
@@ -174,7 +177,7 @@ class Config:
             logger.warning("Invalid mode '%s'; defaulting to 'toggle'", self.mode)
             self.mode = "toggle"
 
-        if self.engine not in ("moonshine", "whisper"):
+        if self.engine not in ("moonshine", "whisper", "mlx-whisper"):
             logger.warning("Invalid engine '%s'; defaulting to 'moonshine'", self.engine)
             self.engine = "moonshine"
 
