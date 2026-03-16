@@ -132,6 +132,23 @@ claude-stt start --background
 
 ---
 
+## How the Daemon Works
+
+The STT daemon runs as a **system-wide background process**, independent of any Claude Code session:
+
+- **Persists** until explicitly stopped (`/claude-stt:stop`) or system reboot
+- **Listens globally** for hotkeys (works when any window is focused)
+- **Status and logs** stored in `~/.claude/plugins/claude-stt/`
+
+Check if it's running:
+```bash
+ps aux | grep claude_stt
+# Or
+cat ~/.claude/plugins/claude-stt/daemon.pid
+```
+
+---
+
 ## Troubleshooting
 
 | Issue | Solution |
@@ -144,6 +161,7 @@ claude-stt start --background
 | Hotkey not triggering | Check for conflicts with other apps. Try `/claude-stt:config` to change hotkey |
 | Text going to wrong window | Plugin tracks original window — ensure Claude Code was focused when recording started |
 | Running under WSL | Not supported; use native Windows or Linux |
+| Daemon still running after closing Claude | This is expected — the daemon is system-wide and persists. Stop it with `/claude-stt:stop` or `kill $(cat ~/.claude/plugins/claude-stt/daemon.pid \| jq -r .pid)` |
 
 ### Logging
 

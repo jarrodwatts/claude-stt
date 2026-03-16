@@ -84,3 +84,6 @@ temp/
 .agents/
 .ralph/
 
+# Local Claude Code notes (not for upstream)
+CLAUDE.local.md
+
